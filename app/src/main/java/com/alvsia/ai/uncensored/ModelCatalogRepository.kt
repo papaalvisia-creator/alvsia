@@ -1,5 +1,6 @@
 package com.alvsia.ai.uncensored
 
+import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -7,6 +8,9 @@ import java.util.concurrent.TimeUnit
 
 class ModelCatalogRepository(private val baseUrl: String) {
     private val client = OkHttpClient.Builder()
+        .certificatePinner(CertificatePinner.Builder()
+            .add("alvsiapanel.unaux.com", "sha256/84+S6cn1vo+IjlQMR5mvqIe5XKMPh28WV9xYVtFKTkk=")
+            .build())
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
