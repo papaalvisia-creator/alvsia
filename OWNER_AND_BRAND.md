@@ -2,7 +2,6 @@
 
 Owner identity: **@OriginalOnwerALV**
 Telegram channel: **https://t.me/ALVISIACHANEL**
-Panel: **https://alvsiapanel.unaux.com**
 
 Brand direction:
 - blue / white
@@ -13,5 +12,5 @@ Brand direction:
 - owner-provided ALVSIA AI UNCENSORED logo
 
 Security rule:
-- never embed panel master secrets, provider API keys, signing keys, or license master keys in the APK.
-- server-side authorization remains authoritative.
+- never embed provider API keys, signing keys, or private authorization secrets in the APK.
+- authorization and entitlement decisions remain authoritative outside the client.
