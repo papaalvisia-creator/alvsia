@@ -26,6 +26,10 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.alvsia.ai.uncensored.security.ApkIntegrity
+import com.alvsia.ai.uncensored.security.RuntimeGuard
+import com.alvsia.ai.uncensored.security.SessionGuard
+import com.alvsia.ai.uncensored.security.ThreatReporter
 
 private val Ink = Color(0xFF050B16)
 private val Panel = Color(0xFF0D1B2B)
@@ -36,6 +40,10 @@ private val Muted = Color(0xFF9CB2C8)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val integrity = ApkIntegrity.inspect(this)
+        if (!integrity.valid) ThreatReporter.report("APK_INTEGRITY", integrity.reasons)
+        val runtime = RuntimeGuard.inspect(this)
+        if (!runtime.clean || runtime.softSignals.isNotEmpty()) ThreatReporter.report("RUNTIME_SCAN", runtime.hardSignals + runtime.softSignals)
         window.statusBarColor = android.graphics.Color.rgb(5, 11, 22)
         window.navigationBarColor = android.graphics.Color.rgb(3, 7, 14)
         setContent { AlvsiaTheme { AlvsiaApp() } }
@@ -51,6 +59,7 @@ private fun AlvsiaApp() {
     val catalog = remember { ModelCatalogRepository(BuildConfig.PANEL_BASE_URL) }
     val scope = rememberCoroutineScope()
     var token by remember { mutableStateOf(prefs.token().orEmpty()) }
+    val sessionGuard = remember { SessionGuard().apply { if (token.isNotBlank()) runCatching { activate(token) } } }
     var license by remember { mutableStateOf("") }
     var authBusy by remember { mutableStateOf(false) }
     var authError by remember { mutableStateOf<String?>(null) }
@@ -80,6 +89,7 @@ private fun AlvsiaApp() {
                     }
                     result.onSuccess {
                         prefs.setToken(it.token)
+                        sessionGuard.activate(it.token)
                         token = it.token
                         expiry = it.expiry
                         answer = "Login panel berhasil. Sesi ALVSIA aktif."
@@ -105,7 +115,7 @@ private fun AlvsiaApp() {
                     Text("UNCENSORED AI", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
                     Text("PERSONAL AI OPERATING SYSTEM", color = Muted, fontSize = 9.sp, letterSpacing = 1.sp)
                 }
-                TextButton(onClick = { prefs.clearSession(); token = ""; license = "" }) { Text("KELUAR", color = Cyan, fontSize = 10.sp) }
+                TextButton(onClick = { sessionGuard.clear(); prefs.clearSession(); token = ""; license = "" }) { Text("KELUAR", color = Cyan, fontSize = 10.sp) }
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -178,11 +188,21 @@ private fun AlvsiaApp() {
                     Button(
                         enabled = !busy && prompt.isNotBlank(),
                         onClick = {
-                            val sent = prompt.trim(); prompt = ""; busy = true
-                            scope.launch {
-                                val result = withContext(Dispatchers.IO) { gateway.chat(selected, sent, token) }
-                                answer = result.getOrElse { it.message ?: "Layanan AI belum tersedia." }
-                                busy = false
+                            val runtime = RuntimeGuard.inspect(context)
+                            if (!sessionGuard.isActive()) {
+                                answer = "Sesi keamanan tidak valid atau kedaluwarsa. Silakan login ulang."
+                                sessionGuard.clear(); prefs.clearSession(); token = ""
+                                ThreatReporter.report("SESSION_REJECTED", listOf("session_inactive"))
+                            } else if (!runtime.clean) {
+                                answer = "Operasi dihentikan karena terdeteksi indikasi instrumentation aktif: ${runtime.hardSignals.joinToString()}"
+                                ThreatReporter.report("RUNTIME_BLOCK", runtime.hardSignals)
+                            } else {
+                                val sent = prompt.trim(); prompt = ""; busy = true
+                                scope.launch {
+                                    val result = withContext(Dispatchers.IO) { gateway.chat(selected, sent, token) }
+                                    answer = result.getOrElse { it.message ?: "Layanan AI belum tersedia." }
+                                    busy = false
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(50.dp).shadow(8.dp, RoundedCornerShape(15.dp)),
