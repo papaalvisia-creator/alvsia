@@ -40,6 +40,7 @@ jobs:
           gradle --no-daemon :app:assembleDebug --stacktrace --console=plain 2>&1 | tee /tmp/alvsia-ai-build.log
       - name: Build release APK
         run: gradle --no-daemon :app:assembleRelease --stacktrace --console=plain
+
       - name: Detect signing configuration
         id: signing
         env:
@@ -55,14 +56,15 @@ jobs:
           set -euo pipefail
           B64="${ALVSIA_KEYSTORE_BASE64:-}"
           B64="$(printf '%s' "$B64" | tr -d '[:space:]')"
+          STOREPASS="${ALVSIA_KEYSTORE_PASSWORD:-${CM_KEYSTORE_PASSWORD:-}}"
           if { [ -n "$B64" ] || [ -n "${CM_KEYSTORE:-}" ]; } &&
-             { [ -n "${ALVSIA_KEYSTORE_PASSWORD:-}" ] || [ -n "${CM_KEYSTORE_PASSWORD:-}" ]; } &&
+             [ -n "$STOREPASS" ] &&
              { [ -z "$B64" ] || [ "$(( ${#B64} % 4 ))" != "1" ]; }; then
             echo "available=true" >> "$GITHUB_OUTPUT"
-            echo "Signing configuration: available"
+            echo "Signing configuration: available (keystore + store password present)"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Release signing secrets are not configured. Build validation remains green, but no final signed APK is published."
+            echo "::warning::Release signing secrets are incomplete; final signed APK will not be published."
           fi
 
       - name: Sign and verify final release APK
@@ -79,16 +81,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p validation-artifacts
-          INPUT=$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)
+          INPUT="$(find app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
           test -s "$INPUT"
+
           KS="$RUNNER_TEMP/alvsia-ai-release.jks"
           KSPASS="${ALVSIA_KEYSTORE_PASSWORD:-${CM_KEYSTORE_PASSWORD:-}}"
           ALIAS="${ALVSIA_KEY_ALIAS:-${CM_KEY_ALIAS:-alvsia}}"
           KEYPASS="${ALVSIA_KEY_PASSWORD:-${CM_KEY_PASSWORD:-$KSPASS}}"
+
           decode_b64_secret() {
             local raw="$1"
-            # Normalize common secret-copy formats: whitespace, data URLs,
-            # surrounding quotes, URL-safe Base64 and missing padding.
             raw="$(printf '%s' "$raw" | tr -d '[:space:]')"
             case "$raw" in
               data:*base64,*) raw="${raw#*base64,}" ;;
@@ -104,11 +106,9 @@ jobs:
               3) raw="${raw}=" ;;
               1) echo "ERROR: invalid Base64 length for signing keystore" >&2; return 1 ;;
             esac
-            if ! printf '%s' "$raw" | base64 --decode > "$KS"; then
-              echo "ERROR: signing keystore secret is not valid Base64 after normalization" >&2
-              return 1
-            fi
+            printf '%s' "$raw" | base64 --decode > "$KS"
           }
+
           if [ -n "${ALVSIA_KEYSTORE_BASE64:-}" ]; then
             decode_b64_secret "$ALVSIA_KEYSTORE_BASE64"
           elif [ -n "${CM_KEYSTORE:-}" ]; then
@@ -117,14 +117,37 @@ jobs:
             echo "ERROR: no signing keystore secret is available"
             exit 1
           fi
+
           test -s "$KS"
-          test -n "$KSPASS"
-          keytool -list -keystore "$KS" -storepass "$KSPASS" >/dev/null
+          echo "Keystore decoded: $(wc -c < "$KS") bytes"
+          echo "Expected alias: $ALIAS"
+
+          # Do not print passwords. keytool diagnostics are intentionally visible
+          # so a bad existing CI secret is distinguishable from an apksigner error.
+          if ! keytool -list -keystore "$KS" -storepass "$KSPASS" >/tmp/alvsia-keytool-list.txt 2>/tmp/alvsia-keytool-error.txt; then
+            echo "::error::Existing keystore could not be opened with the configured CI store password."
+            sed -E 's/(password|passphrase|storepass|keypass)[^:]*:.*/\1: [REDACTED]/Ig' /tmp/alvsia-keytool-error.txt
+            exit 1
+          fi
+
+          if ! grep -Fq "Alias name: $ALIAS" /tmp/alvsia-keytool-list.txt; then
+            echo "::error::Configured key alias was not found in the existing keystore."
+            echo "Available aliases:"
+            grep '^Alias name:' /tmp/alvsia-keytool-list.txt | sed 's/^/  /'
+            exit 1
+          fi
+
           export KSPASS KEYPASS
-          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+
+          echo "Signing release APK with existing keystore..."
           "$APKSIGNER" sign             --ks "$KS"             --ks-key-alias "$ALIAS"             --ks-pass env:KSPASS             --key-pass env:KEYPASS             --out validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk             "$INPUT"
+
+          test -s validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk
           "$APKSIGNER" verify --verbose --print-certs validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk
           sha256sum validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk | tee validation-artifacts/SHA256SUMS.txt
+
       - name: Upload unsigned release validation APK
         if: steps.signing.outputs.available != 'true'
         uses: actions/upload-artifact@v4
