@@ -9,8 +9,8 @@ class ModelRouter {
         require(candidates.isNotEmpty()) { "No model candidates available" }
         val scored = candidates.map { (id, c) ->
             val roleScore = when (task.role) {
-                AgentRole.CODING, AgentRole.BUILD, AgentRole.TEST => c.coding * 3 + c.reasoning * 2
-                AgentRole.RESEARCH, AgentRole.MANAGER, AgentRole.SECURITY, AgentRole.AUDIT => c.reasoning * 3 + c.speed
+                AgentRole.CODING, AgentRole.BUILD, AgentRole.TEST -> c.coding * 3 + c.reasoning * 2
+                AgentRole.RESEARCH, AgentRole.MANAGER, AgentRole.SECURITY, AgentRole.AUDIT -> c.reasoning * 3 + c.speed
                 else -> c.reasoning * 2 + c.speed
             }
             id to roleScore
