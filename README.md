@@ -30,3 +30,8 @@ This repository is the dedicated source for the separate **ALVSIA AI UNCENSORED*
 ## License
 
 The ALVSIA application code is owner-controlled. Third-party model weights, runtimes and SDKs remain subject to their own licenses.
+
+
+## Release target
+
+The release pipeline produces one debug build and one independently signed release APK. Public project documentation intentionally contains no panel endpoint or panel-source details.
