@@ -1,5 +1,6 @@
 package com.alvsia.ai.uncensored
 
+import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,6 +10,9 @@ import java.util.concurrent.TimeUnit
 
 class AiGateway(private val baseUrl: String) {
     private val client = OkHttpClient.Builder()
+        .certificatePinner(CertificatePinner.Builder()
+            .add("alvsiapanel.unaux.com", "sha256/84+S6cn1vo+IjlQMR5mvqIe5XKMPh28WV9xYVtFKTkk=")
+            .build())
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .callTimeout(150, TimeUnit.SECONDS)
