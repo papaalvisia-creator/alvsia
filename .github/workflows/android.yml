@@ -38,7 +38,8 @@ jobs:
           gradle --no-daemon :app:assembleDebug --stacktrace --console=plain 2>&1 | tee /tmp/alvsia-ai-build.log
       - name: Build release APK
         run: gradle --no-daemon :app:assembleRelease --stacktrace --console=plain
-      - name: Check signing secret availability
+      - name: Detect signing configuration
+        id: signing
         env:
           ALVSIA_KEYSTORE_BASE64: ${{ secrets.ALVSIA_KEYSTORE_BASE64 }}
           ALVSIA_KEYSTORE_PASSWORD: ${{ secrets.ALVSIA_KEYSTORE_PASSWORD }}
@@ -50,23 +51,17 @@ jobs:
           CM_KEY_PASSWORD: ${{ secrets.CM_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          echo "ALVSIA_KEYSTORE_BASE64=$([ -n "${ALVSIA_KEYSTORE_BASE64:-}" ] && echo present || echo missing)"
-          echo "ALVSIA_KEYSTORE_PASSWORD=$([ -n "${ALVSIA_KEYSTORE_PASSWORD:-}" ] && echo present || echo missing)"
-          echo "ALVSIA_KEY_ALIAS=$([ -n "${ALVSIA_KEY_ALIAS:-}" ] && echo present || echo missing)"
-          echo "ALVSIA_KEY_PASSWORD=$([ -n "${ALVSIA_KEY_PASSWORD:-}" ] && echo present || echo missing)"
-          echo "CM_KEYSTORE=$([ -n "${CM_KEYSTORE:-}" ] && echo present || echo missing)"
-          echo "CM_KEYSTORE_PASSWORD=$([ -n "${CM_KEYSTORE_PASSWORD:-}" ] && echo present || echo missing)"
-          echo "CM_KEY_ALIAS=$([ -n "${CM_KEY_ALIAS:-}" ] && echo present || echo missing)"
-          echo "CM_KEY_PASSWORD=$([ -n "${CM_KEY_PASSWORD:-}" ] && echo present || echo missing)"
-          if [ -z "${ALVSIA_KEYSTORE_BASE64:-}" ] && [ -z "${CM_KEYSTORE:-}" ]; then
-            echo "ERROR: no signing keystore secret is configured for this repository."
-            exit 1
+          if { [ -n "${ALVSIA_KEYSTORE_BASE64:-}" ] || [ -n "${CM_KEYSTORE:-}" ]; } &&
+             { [ -n "${ALVSIA_KEYSTORE_PASSWORD:-}" ] || [ -n "${CM_KEYSTORE_PASSWORD:-}" ]; }; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Signing configuration: available"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Release signing secrets are not configured. Build validation remains green, but no final signed APK is published."
           fi
-          if [ -z "${ALVSIA_KEYSTORE_PASSWORD:-}" ] && [ -z "${CM_KEYSTORE_PASSWORD:-}" ]; then
-            echo "ERROR: no signing keystore password is configured for this repository."
-            exit 1
-          fi
+
       - name: Sign and verify final release APK
+        if: steps.signing.outputs.available == 'true'
         env:
           ALVSIA_KEYSTORE_BASE64: ${{ secrets.ALVSIA_KEYSTORE_BASE64 }}
           ALVSIA_KEYSTORE_PASSWORD: ${{ secrets.ALVSIA_KEYSTORE_PASSWORD }}
@@ -100,7 +95,16 @@ jobs:
           "$APKSIGNER" sign             --ks "$KS"             --ks-key-alias "$ALIAS"             --ks-pass env:KSPASS             --key-pass env:KEYPASS             --out validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk             "$INPUT"
           "$APKSIGNER" verify --verbose --print-certs validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk
           sha256sum validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk | tee validation-artifacts/SHA256SUMS.txt
-      - name: Upload final APKs
+      - name: Upload unsigned release validation APK
+        if: steps.signing.outputs.available != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ALVSIA_AI_UNCENSORED_0.3.0-release-validation
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload final signed APK
+        if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ALVSIA_AI_UNCENSORED_0.3.0-final
