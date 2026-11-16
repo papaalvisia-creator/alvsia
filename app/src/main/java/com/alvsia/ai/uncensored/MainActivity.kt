@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.LaunchedEffect
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,7 +30,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun AlvsiaApp() {
-    var selected by remember { mutableStateOf(ModelCatalog.starter.first()) }
+    var models by remember { mutableStateOf(ModelCatalog.starter) }\n    var selected by remember { mutableStateOf(ModelCatalog.starter.first()) }
     var query by remember { mutableStateOf("") }
     var prompt by remember { mutableStateOf("") }
     var answer by remember { mutableStateOf("Pilih model lalu kirim pertanyaan.") }
@@ -38,7 +39,7 @@ private fun AlvsiaApp() {
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { SecurePrefs(context) }
-    val gateway = remember { AiGateway(BuildConfig.PANEL_BASE_URL) }
+    val gateway = remember { AiGateway(BuildConfig.PANEL_BASE_URL) }\n    val catalog = remember { ModelCatalogRepository(BuildConfig.PANEL_BASE_URL) }\n    LaunchedEffect(Unit) {\n        val loaded = withContext(Dispatchers.IO) { catalog.load() }\n        if (loaded.isNotEmpty()) { models = loaded; selected = loaded.first() }\n    }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { pad ->
         Column(
@@ -48,7 +49,7 @@ private fun AlvsiaApp() {
                 .padding(16.dp)
         ) {
             Text("ALVSIA AI UNCENSORED", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-            Text("Multi-model AI • Owner: @OriginalOnwerALV", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f))
+            Text("${models.size} models available • Owner: @OriginalOnwerALV", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f))
             Text("Telegram: t.me/ALVISIACHANEL", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f))
             Spacer(Modifier.height(14.dp))
 
@@ -77,7 +78,7 @@ private fun AlvsiaApp() {
                             label = { Text("Cari model") }
                         )
                         LazyColumn(Modifier.heightIn(max = 280.dp).padding(top = 8.dp)) {
-                            items(ModelCatalog.starter.filter {
+                            items(models.filter {
                                 query.isBlank() ||
                                     it.name.contains(query, true) ||
                                     it.tags.any { tag -> tag.contains(query, true) }
