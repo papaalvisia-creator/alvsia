@@ -3,4 +3,10 @@
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors><certificates src="system" /></trust-anchors>
     </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">alvsiapanel.unaux.com</domain>
+        <pin-set expiration="2027-12-31">
+            <pin digest="SHA-256">84+S6cn1vo+IjlQMR5mvqIe5XKMPh28WV9xYVtFKTkk=</pin>
+        </pin-set>
+    </domain-config>
 </network-security-config>

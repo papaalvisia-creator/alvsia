@@ -25,7 +25,7 @@ jobs:
           packages: "platform-tools"
       - name: Install Android API 37 platform
         run: |
-          yes | sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
+          yes | sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
           if [ -d "$ANDROID_SDK_ROOT/platforms/android-37.0" ] && [ ! -e "$ANDROID_SDK_ROOT/platforms/android-37" ]; then
             ln -s android-37.0 "$ANDROID_SDK_ROOT/platforms/android-37"
           fi
@@ -155,11 +155,16 @@ jobs:
           grep -q 'isShrinkResources = true' app/build.gradle.kts
           grep -q 'usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
           grep -q 'allowBackup="false"' app/src/main/AndroidManifest.xml
+          grep -q 'add_library(rasp_guard SHARED' app/src/main/cpp/CMakeLists.txt
+          grep -q '84+S6cn1vo+IjlQMR5mvqIe5XKMPh28WV9xYVtFKTkk=' app/src/main/res/xml/network_security_config.xml
+          grep -q 'NativeGuard' app/proguard-rules.pro
           ! grep -q 'debuggable="true"' app/src/main/AndroidManifest.xml
           mkdir -p /tmp/alvsia-r8-check
           unzip -q "$FINAL" -d /tmp/alvsia-r8-check
           test -f /tmp/alvsia-r8-check/classes.dex
-          echo "Release hardening audit: PASS"
+          test -f /tmp/alvsia-r8-check/lib/arm64-v8a/librasp_guard.so
+          grep -q 'com/alvsia/ai/uncensored/security/NativeGuard' app/src/main/cpp/rasp_guard.cpp
+          echo "Release hardening + native RASP audit: PASS"
           sha256sum "$FINAL" | tee validation-artifacts/SHA256SUMS.txt
 
       - name: Upload unsigned release validation APK
