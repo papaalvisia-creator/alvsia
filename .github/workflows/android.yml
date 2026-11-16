@@ -45,7 +45,19 @@ jobs:
           git push
           exit 1
       - name: Build release APK
-        run: gradle --no-daemon :app:assembleRelease --stacktrace --console=plain
+        id: release
+        continue-on-error: true
+        run: gradle --no-daemon :app:assembleRelease --stacktrace --console=plain 2>&1 | tee /tmp/alvsia-ai-release.log
+      - name: Capture temporary release diagnostic
+        if: steps.release.outcome == 'failure'
+        run: |
+          tail -n 300 /tmp/alvsia-ai-release.log > RELEASE_FAILURE_DIAGNOSTIC.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add RELEASE_FAILURE_DIAGNOSTIC.txt
+          git commit -m "ci: temporary release diagnostic [skip ci]"
+          git push
+          exit 1
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
