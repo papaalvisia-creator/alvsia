@@ -1,5 +1,7 @@
 package com.alvsia.ai.uncensored.security
 
+import com.alvsia.ai.uncensored.BuildConfig
+
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
