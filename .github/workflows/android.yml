@@ -145,8 +145,23 @@ jobs:
           "$APKSIGNER" sign             --ks "$KS"             --ks-key-alias "$ALIAS"             --ks-pass env:KSPASS             --key-pass env:KEYPASS             --out validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk             "$INPUT"
 
           test -s validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk
-          "$APKSIGNER" verify --verbose --print-certs validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk
-          sha256sum validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk | tee validation-artifacts/SHA256SUMS.txt
+          FINAL="validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk"
+          "$APKSIGNER" verify --verbose --print-certs "$FINAL"
+          ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n 1)"
+          test -x "$ZIPALIGN"
+          "$ZIPALIGN" -c -v 4 "$FINAL"
+          echo "Release hardening audit..."
+          grep -q 'isMinifyEnabled = true' app/build.gradle.kts
+          grep -q 'isShrinkResources = true' app/build.gradle.kts
+          grep -q 'usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
+          grep -q 'allowBackup="false"' app/src/main/AndroidManifest.xml
+          ! grep -q 'debuggable="true"' app/src/main/AndroidManifest.xml
+          test ! -d app/build/outputs/apk/release
+          mkdir -p /tmp/alvsia-r8-check
+          unzip -q "$FINAL" -d /tmp/alvsia-r8-check
+          test -f /tmp/alvsia-r8-check/classes.dex
+          echo "Release hardening audit: PASS"
+          sha256sum "$FINAL" | tee validation-artifacts/SHA256SUMS.txt
 
       - name: Upload unsigned release validation APK
         if: steps.signing.outputs.available != 'true'
