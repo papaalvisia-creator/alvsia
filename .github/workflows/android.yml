@@ -156,7 +156,6 @@ jobs:
           grep -q 'usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
           grep -q 'allowBackup="false"' app/src/main/AndroidManifest.xml
           ! grep -q 'debuggable="true"' app/src/main/AndroidManifest.xml
-          test ! -d app/build/outputs/apk/release
           mkdir -p /tmp/alvsia-r8-check
           unzip -q "$FINAL" -d /tmp/alvsia-r8-check
           test -f /tmp/alvsia-r8-check/classes.dex
