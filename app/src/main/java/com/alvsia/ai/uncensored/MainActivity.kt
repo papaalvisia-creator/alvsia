@@ -58,6 +58,12 @@ private fun AlvsiaApp() {
             Text("PERSONAL AI OPERATING SYSTEM • ${models.size} models • @OriginalOnwerALV", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f))
             Text("Telegram: t.me/ALVISIACHANEL", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f))
             Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SmallMetric("AGENTS", "6")
+                SmallMetric("TOOLS", "8")
+                SmallMetric("MEMORY", "ON")
+            }
+            Spacer(Modifier.height(12.dp))
 
             ElevatedCard(shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp)) {
@@ -144,11 +150,31 @@ private fun AlvsiaApp() {
                 }
             }
             Spacer(Modifier.height(10.dp))
+            Surface(shape = RoundedCornerShape(16.dp), color = Color(0xFF0A1B2B), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text("APK PROFILE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text("ALVSIA UNCENSORED AI • v0.3.0", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    Text("com.alvsia.ai.uncensored • Panel: ${BuildConfig.PANEL_BASE_URL}", style = MaterialTheme.typography.bodySmall)
+                    Text("R8 • Signed Release • Verification Gate", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = .6f))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             Text(
                 "ALVSIA • Blue/White Neon Metallic • Local/Remote model catalog",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = .45f)
             )
+        }
+    }
+}
+
+
+@Composable
+private fun SmallMetric(title: String, value: String) {
+    Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = Color(0xFF0A1B2B)) {
+        Column(Modifier.padding(10.dp)) {
+            Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
         }
     }
 }
