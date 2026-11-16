@@ -34,6 +34,26 @@ object RuntimeGuard {
         val nativeFlags = NativeGuard.scanFlags()
         hard += NativeGuard.reasons(nativeFlags)
         if (!NativeGuard.isLoaded() && !BuildConfig.DEBUG) soft += "native_rasp_unavailable"
+        if (NativeGuard.antiDump() > 0) hard += "external_memory_dump_fd"
+        val vmFlags = NativeGuard.vmFlags()
+        if (vmFlags > 0) hard += NativeGuard.reasons(vmFlags)
+        if (vmFlags < 0 && !BuildConfig.DEBUG) soft += "native_secondary_vm_unavailable"
+        runCatching {
+            val cg = File("/proc/self/cgroup").readText().lowercase()
+            listOf("/virtual", "/virtualapp", "/parallelspace", "/dualspace", "/multispace", "/sandbox", "/clone")
+                .filter { it in cg }.forEach { soft += "virtualized_environment:$it" }
+        }
+        runCatching {
+            val cpu = File("/proc/cpuinfo").readText().lowercase()
+            listOf("qemu", "virtualbox", "bluestacks", "genymotion", "nox", "ldplayer", "android-x86")
+                .filter { it in cpu }.forEach { soft += "emulator_marker:$it" }
+        }
+        runCatching {
+            listOf("/data/local/tmp/frida-server", "/data/local/tmp/frida-gadget", "/data/local/tmp/hluda-server",
+                "/data/local/tmp/linjector", "/data/adb/magisk", "/data/adb/ksu")
+                .filter { File(it).exists() }.forEach { soft += "tool_artifact_present" }
+        }
+        knownHookPackages(context.packageManager).forEach { soft += "hook_package:$it" }
         if (Build.TAGS?.contains("test-keys") == true) soft += "test_keys"
         return SecurityReport(hard.isEmpty(), hard.toList(), soft.toList())
     }
