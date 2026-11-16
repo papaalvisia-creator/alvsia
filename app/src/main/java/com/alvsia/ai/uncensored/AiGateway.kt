@@ -34,10 +34,26 @@ class AiGateway(private val baseUrl: String) {
             .build()
 
         client.newCall(request).execute().use { response ->
-            val text = response.body?.string().orEmpty()
-            if (!response.isSuccessful) error("AI gateway HTTP " + response.code + ": " + text.take(500))
-            val json = JSONObject(text)
-            json.optString("message", json.optString("content", text))
+            val responseText = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                val detail = if (responseText.trimStart().startsWith("<")) "server mengembalikan halaman web" else responseText.take(240)
+                error("AI service HTTP ${response.code}: $detail")
+            }
+            if (responseText.trimStart().startsWith("<") || responseText.contains("<html", true)) {
+                error("AI service belum tersedia: endpoint /api/ai/chat mengembalikan HTML, bukan JSON. Backend AI perlu dipasang pada gateway Unaux.")
+            }
+            val json = runCatching { JSONObject(responseText) }.getOrElse {
+                error("Format respons AI tidak valid (bukan JSON).")
+            }
+            val direct = listOf("answer", "message", "content", "response", "output")
+                .firstNotNullOfOrNull { key -> json.optString(key).takeIf { it.isNotBlank() && it != "null" } }
+            if (direct != null) return@use direct
+            val choices = json.optJSONArray("choices")
+            val first = choices?.optJSONObject(0)
+            val openAiContent = first?.optJSONObject("message")?.optString("content")
+                ?: first?.optString("text")
+            if (!openAiContent.isNullOrBlank()) return@use openAiContent
+            error("Respons AI diterima tetapi tidak berisi teks jawaban yang dikenali.")
         }
     }
 }
