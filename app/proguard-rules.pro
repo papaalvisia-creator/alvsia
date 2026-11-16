@@ -1,0 +1,2 @@
+-keep class com.alvsia.ai.uncensored.** { *; }
+-dontwarn okhttp3.**
