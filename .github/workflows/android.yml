@@ -53,8 +53,11 @@ jobs:
           CM_KEY_PASSWORD: ${{ secrets.CM_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          if { [ -n "${ALVSIA_KEYSTORE_BASE64:-}" ] || [ -n "${CM_KEYSTORE:-}" ]; } &&
-             { [ -n "${ALVSIA_KEYSTORE_PASSWORD:-}" ] || [ -n "${CM_KEYSTORE_PASSWORD:-}" ]; }; then
+          B64="${ALVSIA_KEYSTORE_BASE64:-}"
+          B64="$(printf '%s' "$B64" | tr -d '[:space:]')"
+          if { [ -n "$B64" ] || [ -n "${CM_KEYSTORE:-}" ]; } &&
+             { [ -n "${ALVSIA_KEYSTORE_PASSWORD:-}" ] || [ -n "${CM_KEYSTORE_PASSWORD:-}" ]; } &&
+             { [ -z "$B64" ] || [ "$(( ${#B64} % 4 ))" != "1" ]; }; then
             echo "available=true" >> "$GITHUB_OUTPUT"
             echo "Signing configuration: available"
           else
