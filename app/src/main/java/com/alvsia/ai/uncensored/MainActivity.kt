@@ -30,7 +30,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun AlvsiaApp() {
-    var models by remember { mutableStateOf(ModelCatalog.starter) }\n    var selected by remember { mutableStateOf(ModelCatalog.starter.first()) }
+    var models by remember { mutableStateOf(ModelCatalog.starter) }
+    var selected by remember { mutableStateOf(ModelCatalog.starter.first()) }
     var query by remember { mutableStateOf("") }
     var prompt by remember { mutableStateOf("") }
     var answer by remember { mutableStateOf("Pilih model lalu kirim pertanyaan.") }
@@ -39,7 +40,12 @@ private fun AlvsiaApp() {
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { SecurePrefs(context) }
-    val gateway = remember { AiGateway(BuildConfig.PANEL_BASE_URL) }\n    val catalog = remember { ModelCatalogRepository(BuildConfig.PANEL_BASE_URL) }\n    LaunchedEffect(Unit) {\n        val loaded = withContext(Dispatchers.IO) { catalog.load() }\n        if (loaded.isNotEmpty()) { models = loaded; selected = loaded.first() }\n    }
+    val gateway = remember { AiGateway(BuildConfig.PANEL_BASE_URL) }
+    val catalog = remember { ModelCatalogRepository(BuildConfig.PANEL_BASE_URL) }
+    LaunchedEffect(Unit) {
+        val loaded = withContext(Dispatchers.IO) { catalog.load() }
+        if (loaded.isNotEmpty()) { models = loaded; selected = loaded.first() }
+    }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { pad ->
         Column(
