@@ -1,19 +1,14 @@
-# Panel AI Contract
+# ALVSIA AI Provider Contract
 
-The Android client is deliberately separated from the live panel implementation.
+The Android client is deliberately separated from provider implementations.
 
-Current base URL:
-https://alvsiapanel.unaux.com
-
-Required future server contract:
-- authenticated session exchange
-- model catalog endpoint
-- model entitlement check
-- chat completion endpoint
-- usage/rate-limit response
+Supported integration boundaries:
+- OpenAI-compatible gateways
+- Ollama-compatible local endpoints
+- configurable model/provider selection
+- authenticated provider sessions where required
+- model catalog and entitlement metadata
+- usage/rate-limit responses
 - security event reporting
 
-The client currently targets:
-POST /api/ai/chat
-
-This endpoint is an adapter contract and must be matched to the real panel routes before production release. No live panel files are changed by this repository.
+The client must never embed provider master secrets or private authorization credentials.
