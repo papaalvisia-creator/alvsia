@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,8 +22,12 @@ jobs:
           gradle-version: "8.13"
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
-      - name: Upload APK
+      - name: Build release APK
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: alvsia-ai-uncensored-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: alvsia-ai-uncensored-apks
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
