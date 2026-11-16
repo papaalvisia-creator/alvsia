@@ -22,7 +22,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "PANEL_BASE_URL", ""https://alvsiapanel.unaux.com"")
+            buildConfigField("String", "PANEL_BASE_URL", "\"https://alvsiapanel.unaux.com\"")
         }
         release {
             isMinifyEnabled = true
