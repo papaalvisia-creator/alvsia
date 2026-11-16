@@ -40,7 +40,7 @@ object ApkIntegrity {
             (if (si.hasMultipleSigners()) si.apkContentsSigners else si.signingCertificateHistory).first().toByteArray()
         } else {
             @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES).signatures.first().toByteArray()
+            context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES).signatures?.firstOrNull()?.toByteArray() ?: error("no_legacy_signer")
         }
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
     }.getOrNull()
