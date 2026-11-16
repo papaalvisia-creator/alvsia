@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.alvsia.ai.uncensored"
     compileSdk = 37
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.alvsia.ai.uncensored"
@@ -13,7 +14,11 @@ android {
         targetSdk = 37
         versionCode = 3
         versionName = "0.3.0"
+        buildConfigField("String", "CERT_SHA256", "\"99b33815c88a17abbcfe22be15250363f6dfc79c11ffc980e71b62b74b1f295c\"")
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
+
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" } }
 
     buildFeatures {
         compose = true
