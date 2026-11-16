@@ -14,6 +14,7 @@ class SessionGuard {
     @Volatile private var mac: ByteArray? = null
     @Volatile private var startedAt: Long = 0L
     private val ttlMs = 8L * 60L * 60L * 1000L
+    @Volatile private var fallbackKey: SecretKey? = null
 
     @Synchronized fun activate(sessionToken: String) {
         require(sessionToken.matches(Regex("^[0-9a-fA-F]{64}$"))) { "Invalid panel session token" }
@@ -49,7 +50,10 @@ class SessionGuard {
             gen.generateKey()
         }
     }.getOrElse {
-        // Process-only fallback: still binds the session for this process, but is not hardware-backed.
-        SecretKeySpec(ByteArray(32).also(java.security.SecureRandom()::nextBytes), "HmacSHA256")
+        // Reuse one process-only fallback key; never regenerate between activate() and isActive().
+        fallbackKey ?: synchronized(this) {
+            fallbackKey ?: SecretKeySpec(ByteArray(32).also(java.security.SecureRandom()::nextBytes), "HmacSHA256")
+                .also { fallbackKey = it }
+        }
     }
 }
