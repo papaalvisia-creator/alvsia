@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "product": "ALVSIA AI UNCENSORED",
+  "source_policy": "Model metadata is maintained independently from third-party catalogs. Each model must retain its upstream license/source reference.",
+  "models": [
+    {"id":"qwen3.5-27b-heretic","family":"Qwen","tags":["reasoning","coding","uncensored"]},
+    {"id":"qwen3.6-27b-uncensored-heretic","family":"Qwen","tags":["reasoning","coding","uncensored"]},
+    {"id":"glm-4.7-flash-absolute-heresy","family":"GLM","tags":["reasoning","fast","uncensored"]},
+    {"id":"deepseek-r1","family":"DeepSeek","tags":["reasoning","research"]},
+    {"id":"gpt-oss-120b","family":"GPT-OSS","tags":["reasoning","coding"]},
+    {"id":"gpt-oss-20b","family":"GPT-OSS","tags":["fast","coding"]},
+    {"id":"gemma-4-12b-heretic","family":"Gemma","tags":["general","uncensored"]},
+    {"id":"qwen3-vl-8b-abliterated","family":"Qwen","tags":["vision","coding","uncensored"]},
+    {"id":"hermes-3-llama-3.1-8b","family":"Llama","tags":["fast","agent"]},
+    {"id":"llama-3.1-8b-abliterated","family":"Llama","tags":["fast","uncensored"]},
+    {"id":"qwen3.6-35b-moe-abliterated","family":"Qwen","tags":["reasoning","coding","uncensored"]},
+    {"id":"mistral-small-3","family":"Mistral","tags":["coding","fast"]},
+    {"id":"phi-4","family":"Phi","tags":["fast","coding"]},
+    {"id":"llama-4","family":"Llama","tags":["general","vision"]},
+    {"id":"gemma-4","family":"Gemma","tags":["general","coding"]},
+    {"id":"glm-4.7-flash","family":"GLM","tags":["fast","coding"]},
+    {"id":"qwen-coder","family":"Qwen","tags":["coding","agent"]},
+    {"id":"deepseek-coder","family":"DeepSeek","tags":["coding","agent"]}
+  ]
+}
