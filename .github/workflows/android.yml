@@ -1,6 +1,7 @@
 name: ALVSIA AI UNCENSORED Android
 # Release signing accepts normalized Base64 keystore secrets.
 # Release gate: build -> sign -> verify -> artifact
+# CI validation branch: verify normalized keystore decoding
 
 on:
   push:
