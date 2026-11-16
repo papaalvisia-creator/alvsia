@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "com.alvsia.ai.uncensored"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.alvsia.ai.uncensored"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        targetSdk = 37
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildFeatures {
@@ -23,12 +23,12 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "PANEL_BASE_URL", "\"https://alvsiapanel.unaux.com\"")
+            buildConfigField("String", "PANEL_BASE_URL", ""https://alvsiapanel.unaux.com"")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            buildConfigField("String", "PANEL_BASE_URL", "\"https://alvsiapanel.unaux.com\"")
+            buildConfigField("String", "PANEL_BASE_URL", ""https://alvsiapanel.unaux.com"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
