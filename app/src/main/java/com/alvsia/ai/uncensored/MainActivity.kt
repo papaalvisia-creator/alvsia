@@ -59,9 +59,9 @@ private fun AlvsiaApp() {
             Text("Telegram: t.me/ALVISIACHANEL", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f))
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                SmallMetric("AGENTS", "6")
-                SmallMetric("TOOLS", "8")
-                SmallMetric("MEMORY", "ON")
+                SmallMetric("AGENT CORE", "FOUNDATION", Modifier.weight(1f))
+                SmallMetric("TOOL FABRIC", "FOUNDATION", Modifier.weight(1f))
+                SmallMetric("PROJECT MEMORY", "IN-MEMORY", Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
 
@@ -170,8 +170,8 @@ private fun AlvsiaApp() {
 
 
 @Composable
-private fun SmallMetric(title: String, value: String) {
-    Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = Color(0xFF0A1B2B)) {
+private fun SmallMetric(title: String, value: String, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(14.dp), color = Color(0xFF0A1B2B)) {
         Column(Modifier.padding(10.dp)) {
             Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
