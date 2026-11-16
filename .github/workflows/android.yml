@@ -124,13 +124,13 @@ jobs:
 
           # Do not print passwords. keytool diagnostics are intentionally visible
           # so a bad existing CI secret is distinguishable from an apksigner error.
-          if ! keytool -list -keystore "$KS" -storepass "$KSPASS" >/tmp/alvsia-keytool-list.txt 2>/tmp/alvsia-keytool-error.txt; then
+          if ! keytool -list -v -keystore "$KS" -storepass "$KSPASS" >/tmp/alvsia-keytool-list.txt 2>/tmp/alvsia-keytool-error.txt; then
             echo "::error::Existing keystore could not be opened with the configured CI store password."
             sed -E 's/(password|passphrase|storepass|keypass)[^:]*:.*/\1: [REDACTED]/Ig' /tmp/alvsia-keytool-error.txt
             exit 1
           fi
 
-          if ! grep -Fq "Alias name: $ALIAS" /tmp/alvsia-keytool-list.txt; then
+          if ! grep -Fxq "Alias name: $ALIAS" /tmp/alvsia-keytool-list.txt; then
             echo "::error::Configured key alias was not found in the existing keystore."
             echo "Available aliases:"
             grep '^Alias name:' /tmp/alvsia-keytool-list.txt | sed 's/^/  /'
