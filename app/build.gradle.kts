@@ -23,12 +23,12 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "PANEL_BASE_URL", ""https://alvsiapanel.unaux.com"")
+            buildConfigField("String", "PANEL_BASE_URL", "\"https://alvsiapanel.unaux.com\"")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            buildConfigField("String", "PANEL_BASE_URL", ""https://alvsiapanel.unaux.com"")
+            buildConfigField("String", "PANEL_BASE_URL", "\"https://alvsiapanel.unaux.com\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -43,7 +43,6 @@ android {
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
-    androidTestImplementation(composeBom)
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("androidx.compose.material3:material3")
