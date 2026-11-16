@@ -81,16 +81,26 @@ jobs:
           KSPASS="${ALVSIA_KEYSTORE_PASSWORD:-${CM_KEYSTORE_PASSWORD:-}}"
           ALIAS="${ALVSIA_KEY_ALIAS:-${CM_KEY_ALIAS:-alvsia}}"
           KEYPASS="${ALVSIA_KEY_PASSWORD:-${CM_KEY_PASSWORD:-$KSPASS}}"
+          decode_b64_secret() {
+            local raw="$1"
+            # Accept normal Base64 secrets with wrapping/whitespace and reject malformed blobs cleanly.
+            raw="$(printf '%s' "$raw" | tr -d '[:space:]')"
+            case "$raw" in
+              data:*base64,*) raw="${raw#*base64,}" ;;
+            esac
+            printf '%s' "$raw" | base64 --decode > "$KS"
+          }
           if [ -n "${ALVSIA_KEYSTORE_BASE64:-}" ]; then
-            printf '%s' "$ALVSIA_KEYSTORE_BASE64" | base64 --decode > "$KS"
+            decode_b64_secret "$ALVSIA_KEYSTORE_BASE64"
           elif [ -n "${CM_KEYSTORE:-}" ]; then
-            if [ -f "$CM_KEYSTORE" ]; then cp "$CM_KEYSTORE" "$KS"; else printf '%s' "$CM_KEYSTORE" | base64 --decode > "$KS"; fi
+            if [ -f "$CM_KEYSTORE" ]; then cp "$CM_KEYSTORE" "$KS"; else decode_b64_secret "$CM_KEYSTORE"; fi
           else
             echo "ERROR: no signing keystore secret is available"
             exit 1
           fi
           test -s "$KS"
           test -n "$KSPASS"
+          keytool -list -keystore "$KS" -storepass "$KSPASS" >/dev/null
           export KSPASS KEYPASS
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
           "$APKSIGNER" sign             --ks "$KS"             --ks-key-alias "$ALIAS"             --ks-pass env:KSPASS             --key-pass env:KEYPASS             --out validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk             "$INPUT"
