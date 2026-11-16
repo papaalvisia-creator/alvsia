@@ -54,8 +54,8 @@ private fun AlvsiaApp() {
                 .background(Brush.verticalGradient(listOf(Color(0xFF06111F), Color(0xFF02060B))))
                 .padding(16.dp)
         ) {
-            Text("ALVSIA AI UNCENSORED", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
-            Text("${models.size} models available • Owner: @OriginalOnwerALV", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f))
+            Text("ALVSIA UNCENSORED AI", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("PERSONAL AI OPERATING SYSTEM • ${models.size} models • @OriginalOnwerALV", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .72f))
             Text("Telegram: t.me/ALVISIACHANEL", color = MaterialTheme.colorScheme.onSurface.copy(alpha = .55f))
             Spacer(Modifier.height(14.dp))
 
