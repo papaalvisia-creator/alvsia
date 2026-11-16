@@ -1,4 +1,5 @@
 name: ALVSIA AI UNCENSORED Android
+# Release gate: build -> sign -> verify -> artifact
 
 on:
   push:
