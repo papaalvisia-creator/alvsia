@@ -189,7 +189,11 @@ private fun AlvsiaApp() {
                         enabled = !busy && prompt.isNotBlank(),
                         onClick = {
                             val runtime = RuntimeGuard.inspect(context)
-                            if (!sessionGuard.isActive()) {
+                            val integrity = ApkIntegrity.inspect(context)
+                            if (!BuildConfig.DEBUG && !integrity.valid) {
+                                answer = "Pemeriksaan integritas APK gagal: ${integrity.reasons.joinToString()}"
+                                ThreatReporter.report("APK_INTEGRITY_BLOCK", integrity.reasons)
+                            } else if (!sessionGuard.isActive()) {
                                 answer = "Sesi keamanan tidak valid atau kedaluwarsa. Silakan login ulang."
                                 sessionGuard.clear(); prefs.clearSession(); token = ""
                                 ThreatReporter.report("SESSION_REJECTED", listOf("session_inactive"))
