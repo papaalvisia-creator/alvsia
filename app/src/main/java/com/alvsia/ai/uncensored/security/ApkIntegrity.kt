@@ -21,9 +21,22 @@ object ApkIntegrity {
             val apk = File(info.sourceDir)
             if (!apk.isFile || apk.length() !in 1_000_000L..150_000_000L) reasons += "apk_size_invalid"
             ZipFile(apk).use { zip ->
-                val dex = zip.entries().asSequence().filter { it.name.matches(Regex("classes(\\d+)?\\.dex")) }.toList()
-                if (dex.isEmpty() || dex.size > 32) reasons += "dex_inventory_invalid"
+                val dex = zip.entries().asSequence()
+                    .filter { it.name.matches(Regex("classes(\\d+)?\\.dex")) }
+                    .toList()
+                if (dex.isEmpty() || dex.size > 32 || dex.any { it.size <= 0L }) {
+                    reasons += "dex_inventory_invalid"
+                }
                 if (zip.getEntry("AndroidManifest.xml") == null) reasons += "manifest_missing"
+                // These entries must survive the release packaging pipeline.
+                // APK v2/v3 signing authenticates the complete archive at install;
+                // this runtime inventory is an additional structural sanity check.
+                if (zip.getEntry("resources.arsc")?.size?.let { it > 0L } != true) {
+                    reasons += "resource_table_missing"
+                }
+                if (zip.getEntry("lib/arm64-v8a/librasp_guard.so")?.size?.let { it > 0L } != true) {
+                    reasons += "native_rasp_library_missing"
+                }
             }
         }.onFailure { reasons += "apk_inspection_failed" }
         val signer = signerSha256(context)
