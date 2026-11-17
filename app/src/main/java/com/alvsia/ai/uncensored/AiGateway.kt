@@ -21,7 +21,7 @@ class AiGateway(private val baseUrl: String) {
         .retryOnConnectionFailure(false)
         .build()
 
-    fun chat(model: AiModel, message: String, token: String?): Result<String> = runCatching {
+    fun chat(model: AiModel, message: String, token: String?, hwid: String): Result<String> = runCatching {
         require(baseUrl.startsWith("https://")) { "AI gateway must use HTTPS" }
         require(message.toByteArray(StandardCharsets.UTF_8).size <= MAX_REQUEST_BYTES) {
             "Pesan terlalu besar. Batas permintaan adalah 1 MiB."
@@ -30,16 +30,18 @@ class AiGateway(private val baseUrl: String) {
         val body = JSONObject().apply {
             put("model", model.id)
             put("message", message)
-            put("provider", model.provider)
+            put("provider", "openai-compatible")
+            put("hwid", hwid)
             put("app", "ALVSIA_AI_UNCENSORED")
         }.toString().toRequestBody("application/json".toMediaType())
 
         val request = Request.Builder()
-            .url(baseUrl.trimEnd('/') + "/api/ai/chat")
+            .url(baseUrl.trimEnd('/') + "/api/ai/chat.php")
             .post(body)
             .header("Accept", "application/json")
             .header("User-Agent", "ALVSIA-AI-UNCENSORED")
             .header("X-ALVSIA-App", "ALVSIA_AI_UNCENSORED")
+            .header("X-ALVSIA-HWID", hwid)
             .apply { if (!token.isNullOrBlank()) header("Authorization", "Bearer $token") }
             .build()
 
