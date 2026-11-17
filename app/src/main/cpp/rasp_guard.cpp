@@ -321,6 +321,9 @@ static int check_jni_prologue() {
 //     Sprint 1: Detect frida-server, gadget, hluda-server artifacts
 // ─────────────────────────────────────────────────────────────────────
 static const char* DEV_FILE_PATHS[] = {
+    // Only high-confidence instrumentation artifacts may produce a hard
+    // runtime signal. Root managers and module directories are risk signals,
+    // not proof of an active attack; do not block AI sessions for their presence.
     "/data/local/tmp/frida-server",
     "/data/local/tmp/frida-gadget",
     "/data/local/tmp/hluda-server",
@@ -328,15 +331,8 @@ static const char* DEV_FILE_PATHS[] = {
     "/data/local/tmp/frida-helper-32",
     "/data/local/tmp/frida-helper-64",
     "/data/local/tmp/linjector",
-    "/data/local/tmp/objection",
-    "/data/local/tmp/agent",
-    "/data/local/tmp/fs-main",
     "/system/bin/frida-server",
     "/system/xbin/frida-server",
-    "/sbin/.magisk",
-    "/data/adb/magisk",
-    "/data/adb/ksu",
-    "/data/adb/modules",
     nullptr
 };
 
