@@ -73,7 +73,13 @@ class AiGateway(private val baseUrl: String) {
             .header("Accept-Language", "en-US,en;q=0.9")
             .header("X-ALVSIA-App", "ALVSIA_AI_UNCENSORED")
             .header("X-ALVSIA-HWID", hwid)
-            .apply { if (!token.isNullOrBlank()) header("Authorization", "Bearer $token") }
+            .apply {
+                if (!token.isNullOrBlank()) {
+                    header("Authorization", "Bearer $token")
+                    // Some shared-host PHP/FastCGI stacks strip Authorization; send a scoped fallback header too.
+                    header("X-ALVSIA-Session", token)
+                }
+            }
             .build()
 
         executeWithHostingGate(request).use { response ->
