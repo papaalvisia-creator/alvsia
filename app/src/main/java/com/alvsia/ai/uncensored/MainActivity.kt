@@ -204,7 +204,7 @@ private fun AlvsiaApp() {
                             } else {
                                 val sent = prompt.trim(); prompt = ""; busy = true
                                 scope.launch {
-                                    val result = withContext(Dispatchers.IO) { gateway.chat(selected, sent, token) }
+                                    val result = withContext(Dispatchers.IO) { gateway.chat(selected, sent, token, PanelAuth.deviceId(context)) }
                                     answer = result.getOrElse { it.message ?: "Layanan AI belum tersedia." }
                                     busy = false
                                 }
