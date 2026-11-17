@@ -161,8 +161,9 @@ jobs:
           ! grep -q 'debuggable="true"' app/src/main/AndroidManifest.xml
           mkdir -p /tmp/alvsia-r8-check
           unzip -q "$FINAL" -d /tmp/alvsia-r8-check
-          test -f /tmp/alvsia-r8-check/classes.dex
-          test -f /tmp/alvsia-r8-check/lib/arm64-v8a/librasp_guard.so
+          test -s /tmp/alvsia-r8-check/classes.dex
+          test -s /tmp/alvsia-r8-check/resources.arsc
+          test -s /tmp/alvsia-r8-check/lib/arm64-v8a/librasp_guard.so
           grep -q 'com/alvsia/ai/uncensored/security/NativeGuard' app/src/main/cpp/rasp_guard.cpp
           echo "Release hardening + native RASP audit: PASS"
           sha256sum "$FINAL" | tee validation-artifacts/SHA256SUMS.txt
