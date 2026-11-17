@@ -122,8 +122,6 @@ jobs:
           echo "Keystore decoded: $(wc -c < "$KS") bytes"
           echo "Expected alias: $ALIAS"
 
-          # Do not print passwords. keytool diagnostics are intentionally visible
-          # so a bad existing CI secret is distinguishable from an apksigner error.
           if ! keytool -list -v -keystore "$KS" -storepass "$KSPASS" >/tmp/alvsia-keytool-list.txt 2>/tmp/alvsia-keytool-error.txt; then
             echo "::error::Existing keystore could not be opened with the configured CI store password."
             sed -E 's/(password|passphrase|storepass|keypass)[^:]*:.*/\1: [REDACTED]/Ig' /tmp/alvsia-keytool-error.txt
@@ -142,7 +140,7 @@ jobs:
           test -x "$APKSIGNER"
 
           echo "Signing release APK with existing keystore..."
-          "$APKSIGNER" sign             --ks "$KS"             --ks-key-alias "$ALIAS"             --ks-pass env:KSPASS             --key-pass env:KEYPASS             --out validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk             "$INPUT"
+          "$APKSIGNER" sign --ks "$KS" --ks-key-alias "$ALIAS" --ks-pass env:KSPASS --key-pass env:KEYPASS --out validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk "$INPUT"
 
           test -s validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk
           FINAL="validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk"
@@ -166,6 +164,9 @@ jobs:
           grep -q 'add_library(rasp_guard SHARED' app/src/main/cpp/CMakeLists.txt
           grep -q '84+S6cn1vo+IjlQMR5mvqIe5XKMPh28WV9xYVtFKTkk=' app/src/main/res/xml/network_security_config.xml
           grep -q 'NativeGuard' app/proguard-rules.pro
+          grep -q 'updateAAD(AAD)' app/src/main/java/com/alvsia/ai/uncensored/SecurePrefs.kt
+          grep -q 'SystemClock.elapsedRealtime()' app/src/main/java/com/alvsia/ai/uncensored/security/SessionGuard.kt
+          ! grep -q 'System.currentTimeMillis()' app/src/main/java/com/alvsia/ai/uncensored/security/SessionGuard.kt
           ! grep -q 'debuggable="true"' app/src/main/AndroidManifest.xml
           mkdir -p /tmp/alvsia-r8-check
           unzip -q "$FINAL" -d /tmp/alvsia-r8-check
@@ -173,7 +174,7 @@ jobs:
           test -s /tmp/alvsia-r8-check/resources.arsc
           test -s /tmp/alvsia-r8-check/lib/arm64-v8a/librasp_guard.so
           grep -q 'com/alvsia/ai/uncensored/security/NativeGuard' app/src/main/cpp/rasp_guard.cpp
-          echo "Release hardening + native RASP audit: PASS"
+          echo "Release hardening + native RASP + secure session audit: PASS"
           sha256sum "$FINAL" | tee validation-artifacts/SHA256SUMS.txt
 
       - name: Upload unsigned release validation APK
