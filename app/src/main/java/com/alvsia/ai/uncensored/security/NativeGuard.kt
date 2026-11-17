@@ -46,6 +46,6 @@ object NativeGuard {
         if (flags and 0x100 != 0) add("ptrace_wchan")
         if (flags and 0x200 != 0) add("late_hook_library")
         if (flags and 0x400 != 0) add("jni_prologue")
-        if (flags and 0x800 != 0) add("developer_tool_artifact")
+        if (flags and 0x800 != 0) add("active_instrumentation_artifact")
     }
 }
