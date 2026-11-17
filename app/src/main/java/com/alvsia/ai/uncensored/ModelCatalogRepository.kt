@@ -5,6 +5,7 @@ import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class ModelCatalogRepository(private val baseUrl: String) {
@@ -21,7 +22,7 @@ class ModelCatalogRepository(private val baseUrl: String) {
         return runCatching {
             require(baseUrl.startsWith("https://")) { "Model catalog must use HTTPS" }
             val request = Request.Builder()
-                .url(baseUrl.trimEnd('/') + "/api/ai/models")
+                .url(baseUrl.trimEnd('/') + "/api/ai/models.php")
                 .header("Accept", "application/json")
                 .get()
                 .build()
@@ -37,14 +38,15 @@ class ModelCatalogRepository(private val baseUrl: String) {
 
                 buildList {
                     for (i in 0 until root.length()) {
-                        val item = root.getJSONObject(i)
-                        val id = item.getString("id")
+                        val rawItem = root.get(i)
+                        val item = rawItem as? JSONObject ?: JSONObject()
+                        val id = if (rawItem is String) rawItem else item.getString("id")
                         require(id.length in 1..MAX_ID_LENGTH)
                         require(id.matches(Regex("^[A-Za-z0-9._:/-]+$")))
 
-                        val name = item.optString("name", id).take(MAX_NAME_LENGTH)
-                        val provider = item.optString("provider", "ALVSIA").take(MAX_PROVIDER_LENGTH)
-                        val family = item.optString("family", "unknown").take(MAX_FAMILY_LENGTH)
+                        val name = (if (rawItem is String) id else item.optString("name", id)).take(MAX_NAME_LENGTH)
+                        val provider = (if (rawItem is String) "openai-compatible" else item.optString("provider", "openai-compatible")).take(MAX_PROVIDER_LENGTH)
+                        val family = (if (rawItem is String) "Groq" else item.optString("family", "unknown")).take(MAX_FAMILY_LENGTH)
                         val tagsJson = item.optJSONArray("tags")
                         require(tagsJson == null || tagsJson.length() <= MAX_TAGS)
 
