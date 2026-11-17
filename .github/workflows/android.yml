@@ -146,7 +146,15 @@ jobs:
 
           test -s validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk
           FINAL="validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk"
-          "$APKSIGNER" verify --verbose --print-certs "$FINAL"
+          VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --print-certs "$FINAL" 2>&1)"
+          printf '%s\n' "$VERIFY_OUTPUT"
+          EXPECTED_CERT="$(grep -oE '[0-9a-fA-F]{64}' app/build.gradle.kts | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          ACTUAL_CERT="$(printf '%s\n' "$VERIFY_OUTPUT" | sed -n 's/.*certificate SHA-256 digest: \\([0-9a-fA-F]\\{64\\}\\).*/\\1/p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          if [ -z "$EXPECTED_CERT" ] || [ -z "$ACTUAL_CERT" ] || [ "$ACTUAL_CERT" != "$EXPECTED_CERT" ]; then
+            echo "::error::Signed APK certificate does not match BuildConfig.CERT_SHA256."
+            exit 1
+          fi
+          echo "APK signer matches runtime certificate pin."
           ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n 1)"
           test -x "$ZIPALIGN"
           "$ZIPALIGN" -c -v 4 "$FINAL"
