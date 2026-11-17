@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("app.talsec.plugin")
 }
 
 android {
@@ -19,6 +20,10 @@ android {
     }
 
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" } }
+
+    talsec {
+        sdkVersion = "20.0.1"
+    }
 
     buildFeatures {
         compose = true
