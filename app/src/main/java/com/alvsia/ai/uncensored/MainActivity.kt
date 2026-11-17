@@ -5,6 +5,7 @@ import androidx.activity.compose.setContent
 import android.os.Bundle
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -108,7 +109,7 @@ private fun AlvsiaApp() {
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Image(painterResource(R.drawable.alvsia_ai_logo), null, modifier = Modifier.size(54.dp).shadow(14.dp, CircleShape))
+                Image(painterResource(R.drawable.alvsia_ai_logo), null, modifier = Modifier.border(2.dp, Brush.sweepGradient(listOf(Color(0xFF55C7FF), Color(0xFFCAD7E5), Color(0xFF244A70), Color(0xFF55C7FF))), CircleShape).padding(4.dp).size(54.dp).shadow(14.dp, CircleShape))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("ALVSIA", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
@@ -255,7 +256,7 @@ private fun LoginExperience(
         contentAlignment = Alignment.Center
     ) {
         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Image(painterResource(R.drawable.alvsia_ai_logo), null, modifier = Modifier.size(150.dp).shadow(28.dp, CircleShape))
+            Image(painterResource(R.drawable.alvsia_ai_logo), null, modifier = Modifier.border(2.dp, Brush.sweepGradient(listOf(Color(0xFF55C7FF), Color(0xFFCAD7E5), Color(0xFF244A70), Color(0xFF55C7FF))), CircleShape).padding(6.dp).size(150.dp).shadow(28.dp, CircleShape))
             Spacer(Modifier.height(22.dp))
             Text("ALVSIA", color = Blue, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 5.sp)
             Text("UNCENSORED AI", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Black)
@@ -267,7 +268,7 @@ private fun LoginExperience(
             ) {
                 Column(Modifier.padding(22.dp)) {
                     Text("SECURE ACCESS", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.5.sp)
-                    Text("Login dengan lisensi ALVSIA", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    Text("ENTER THE KEY YOU NOOBS", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.7.sp)
                     Spacer(Modifier.height(16.dp))
                     OutlinedTextField(
                         value = license, onValueChange = onLicense,
