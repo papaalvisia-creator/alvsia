@@ -396,23 +396,41 @@ native_anti_dump(JNIEnv*, jobject) {
     DIR* proc = opendir("/proc");
     if (!proc) return 0;
     struct dirent* de;
-    while ((de = readdir(proc)) != nullptr) {
-        int pid = atoi(de->d_name);
-        if (pid == 0 || pid == selfpid) continue;
+    int inspected_fds = 0;
+    const int max_fds_to_inspect = 4096;
+    const uid_t self_uid = getuid();
+    while ((de = readdir(proc)) != nullptr && inspected_fds < max_fds_to_inspect) {
+        char* end = nullptr;
+        long parsed_pid = strtol(de->d_name, &end, 10);
+        if (end == de->d_name || *end != '\\0' || parsed_pid <= 0 || parsed_pid == selfpid) continue;
+        const int pid = (int)parsed_pid;
+
+        // Android isolates applications by UID. Inspect only same-UID processes:
+        // other applications cannot normally open this app's /proc/<pid>/mem,
+        // and traversing every process FD is expensive and mostly denied by SELinux.
+        char procdir[64];
+        snprintf(procdir, sizeof(procdir), "/proc/%d", pid);
+        struct stat proc_stat;
+        if (stat(procdir, &proc_stat) != 0 || proc_stat.st_uid != self_uid) continue;
+
         char fddir[64];
         snprintf(fddir, sizeof(fddir), "/proc/%d/fd", pid);
         DIR* fdd = opendir(fddir);
         if (!fdd) continue;
         struct dirent* fde;
-        while ((fde = readdir(fdd)) != nullptr) {
+        while ((fde = readdir(fdd)) != nullptr && inspected_fds < max_fds_to_inspect) {
+            if (fde->d_name[0] == '.') continue;
+            ++inspected_fds;
             char fdpath[128];
             snprintf(fdpath, sizeof(fdpath), "/proc/%d/fd/%s", pid, fde->d_name);
             char link[256] = {};
-            if (readlink(fdpath, link, sizeof(link) - 1) > 0) {
-                if (strcmp(link, selfmem) == 0) { found++; }
+            if (readlink(fdpath, link, sizeof(link) - 1) > 0 && strcmp(link, selfmem) == 0) {
+                found++;
+                break;
             }
         }
         closedir(fdd);
+        if (found > 0) break;
     }
     closedir(proc);
     return (jint)found;
