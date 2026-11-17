@@ -1,7 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("app.talsec.plugin")
+    id("app.talsec.plugin") version "1.1.0"
 }
 
 android {
