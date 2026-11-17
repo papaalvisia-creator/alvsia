@@ -124,7 +124,7 @@ class PanelAuth(private val baseUrl: String) {
         return body
     }
 
-    private fun solveTestCookie(html: String, pageUrl: String): Boolean = try {
+    private fun solveTestCookie(html: String, pageUrl: String): Boolean {\n        return try {
         val re = Regex("""a=toNumbers\("([0-9a-f]+)"\),b=toNumbers\("([0-9a-f]+)"\),c=toNumbers\("([0-9a-f]+)"\)""")
         val m = re.find(html) ?: return false
         val key = hexToBytes(m.groupValues[1])
