@@ -13,6 +13,7 @@ data class AiModel(
 
 object ModelCatalog {
     val starter = listOf(
+        AiModel("openai/gpt-oss-20b","GPT-OSS 20B (Groq)","Groq","GPT-OSS",listOf("fast","coding"),"https://groq.com","https://groq.com"),
         AiModel("qwen3.5-27b-heretic","Qwen 3.5 27B Heretic","Hugging Face","Qwen",listOf("reasoning","coding","uncensored"),"https://huggingface.co","https://huggingface.co"),
         AiModel("qwen3.6-27b-uncensored-heretic","Qwen 3.6 27B Uncensored Heretic","Hugging Face","Qwen",listOf("reasoning","coding","uncensored"),"https://huggingface.co","https://huggingface.co"),
         AiModel("glm-4.7-flash-absolute-heresy","GLM 4.7 Flash Absolute Heresy","Hugging Face","GLM",listOf("reasoning","fast","uncensored"),"https://huggingface.co","https://huggingface.co"),
