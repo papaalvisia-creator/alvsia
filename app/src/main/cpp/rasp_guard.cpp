@@ -17,6 +17,7 @@
 #include <time.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <errno.h>
 #include <signal.h>
 #include <pthread.h>
@@ -402,7 +403,7 @@ native_anti_dump(JNIEnv*, jobject) {
     while ((de = readdir(proc)) != nullptr && inspected_fds < max_fds_to_inspect) {
         char* end = nullptr;
         long parsed_pid = strtol(de->d_name, &end, 10);
-        if (end == de->d_name || *end != '\\0' || parsed_pid <= 0 || parsed_pid == selfpid) continue;
+        if (end == de->d_name || *end != '\0' || parsed_pid <= 0 || parsed_pid == selfpid) continue;
         const int pid = (int)parsed_pid;
 
         // Android isolates applications by UID. Inspect only same-UID processes:
