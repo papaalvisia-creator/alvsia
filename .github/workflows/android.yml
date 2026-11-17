@@ -166,6 +166,9 @@ jobs:
           grep -q 'NativeGuard' app/proguard-rules.pro
           grep -q 'updateAAD(AAD)' app/src/main/java/com/alvsia/ai/uncensored/SecurePrefs.kt
           grep -q 'SystemClock.elapsedRealtime()' app/src/main/java/com/alvsia/ai/uncensored/security/SessionGuard.kt
+          grep -q 'HttpBodyGuard.readUtf8' app/src/main/java/com/alvsia/ai/uncensored/AiGateway.kt
+          grep -q 'HttpBodyGuard.readUtf8' app/src/main/java/com/alvsia/ai/uncensored/ModelCatalogRepository.kt
+          grep -q 'MAX_RESPONSE_BYTES' app/src/main/java/com/alvsia/ai/uncensored/AiGateway.kt
           ! grep -q 'System.currentTimeMillis()' app/src/main/java/com/alvsia/ai/uncensored/security/SessionGuard.kt
           ! grep -q 'debuggable="true"' app/src/main/AndroidManifest.xml
           mkdir -p /tmp/alvsia-r8-check
