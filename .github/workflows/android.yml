@@ -149,7 +149,7 @@ jobs:
           VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --print-certs "$FINAL" 2>&1)"
           printf '%s\n' "$VERIFY_OUTPUT"
           EXPECTED_CERT="$(grep -oE '[0-9a-fA-F]{64}' app/build.gradle.kts | head -n 1 | tr '[:upper:]' '[:lower:]')"
-          ACTUAL_CERT="$(printf '%s\n' "$VERIFY_OUTPUT" | sed -n 's/.*certificate SHA-256 digest: \\([0-9a-fA-F]\\{64\\}\\).*/\\1/p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          ACTUAL_CERT="$(echo "$VERIFY_OUTPUT" | grep -oE 'certificate SHA-256 digest: [0-9a-fA-F]{64}' | awk '{print $NF}' | head -n 1 | tr '[:upper:]' '[:lower:]')"
           if [ -z "$EXPECTED_CERT" ] || [ -z "$ACTUAL_CERT" ] || [ "$ACTUAL_CERT" != "$EXPECTED_CERT" ]; then
             echo "::error::Signed APK certificate does not match BuildConfig.CERT_SHA256."
             exit 1
