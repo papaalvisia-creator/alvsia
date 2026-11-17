@@ -198,7 +198,7 @@ private fun AlvsiaApp() {
                                 answer = "Sesi keamanan tidak valid atau kedaluwarsa. Silakan login ulang."
                                 sessionGuard.clear(); prefs.clearSession(); token = ""
                                 ThreatReporter.report("SESSION_REJECTED", listOf("session_inactive"))
-                            } else if (!runtime.clean) {
+                            } else if (!BuildConfig.DEBUG && !runtime.clean) {
                                 answer = "Operasi dihentikan karena terdeteksi indikasi instrumentation aktif: ${runtime.hardSignals.joinToString()}"
                                 ThreatReporter.report("RUNTIME_BLOCK", runtime.hardSignals)
                             } else {
