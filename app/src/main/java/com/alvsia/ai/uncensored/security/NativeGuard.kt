@@ -1,10 +1,13 @@
 package com.alvsia.ai.uncensored.security
 
 import java.io.File
+import android.os.SystemClock
 
 /** Native RASP bridge ported from ALVSIA SMART TOOL; no Smart Tool keys or payload seeds are copied. */
 object NativeGuard {
     @Volatile private var loaded = false
+    @Volatile private var lastAntiDumpScanAt = 0L
+    @Volatile private var cachedAntiDumpResult = 0
     init { try { System.loadLibrary("rasp_guard"); loaded = true } catch (_: Throwable) { loaded = false } }
 
     private external fun nativeScanFlags(): Int
@@ -16,7 +19,14 @@ object NativeGuard {
 
     fun isLoaded() = loaded
     fun scanFlags(): Int = if (loaded) runCatching { nativeScanFlags() }.getOrElse { fallbackFlags() } else fallbackFlags()
-    fun antiDump(): Int = if (loaded) runCatching { nativeAntiDump() }.getOrDefault(0) else 0
+    @Synchronized fun antiDump(): Int {
+        if (!loaded) return 0
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastAntiDumpScanAt < ANTI_DUMP_CACHE_MS) return cachedAntiDumpResult
+        cachedAntiDumpResult = runCatching { nativeAntiDump() }.getOrDefault(0)
+        lastAntiDumpScanAt = now
+        return cachedAntiDumpResult
+    }
     fun vmFlags(): Int = if (loaded) runCatching { nativeVmFlags() }.getOrDefault(-1) else -1
     fun wipe(bytes: ByteArray) { if (loaded) runCatching { nativeWipe(bytes) }.onFailure { bytes.fill(0) } else bytes.fill(0) }
 
@@ -38,6 +48,8 @@ object NativeGuard {
         }
         return flags
     }
+
+    private const val ANTI_DUMP_CACHE_MS = 15_000L
 
     fun reasons(flags: Int): List<String> = buildList {
         if (flags and 1 != 0) add("tracer_pid")
