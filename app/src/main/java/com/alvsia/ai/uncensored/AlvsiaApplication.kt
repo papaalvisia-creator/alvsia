@@ -9,8 +9,8 @@ import com.alvsia.ai.uncensored.security.ThreatReporter
 
 /**
  * Starts freeRASP in the background. Signals are telemetry-only at this stage:
- * legitimate rooted/developer devices must not lose AI or panel access because
- * of a low-confidence environment signal.
+ * legitimate rooted/developer devices must not lose AI access because of a low-confidence
+ * environment signal.
  */
 class AlvsiaApplication : Application() {
     private val threatListener = object : ThreatListener.ThreatDetected() {
