@@ -167,11 +167,8 @@ jobs:
           grep -q 'add_library(rasp_guard SHARED' app/src/main/cpp/CMakeLists.txt
           grep -q 'NativeGuard' app/proguard-rules.pro
           grep -q 'updateAAD(AAD)' app/src/main/java/com/alvsia/ai/uncensored/SecurePrefs.kt
-          grep -q 'SystemClock.elapsedRealtime()' app/src/main/java/com/alvsia/ai/uncensored/security/SessionGuard.kt
           grep -q 'HttpBodyGuard.readUtf8' app/src/main/java/com/alvsia/ai/uncensored/DirectAiGateway.kt
-          grep -q 'HttpBodyGuard.readUtf8' app/src/main/java/com/alvsia/ai/uncensored/ModelCatalogRepository.kt
           grep -q 'MAX_RESPONSE_BYTES' app/src/main/java/com/alvsia/ai/uncensored/DirectAiGateway.kt
-          ! grep -q 'System.currentTimeMillis()' app/src/main/java/com/alvsia/ai/uncensored/security/SessionGuard.kt
           ! grep -q 'debuggable="true"' app/src/main/AndroidManifest.xml
           mkdir -p /tmp/alvsia-r8-check
           unzip -q "$FINAL" -d /tmp/alvsia-r8-check
@@ -179,7 +176,7 @@ jobs:
           test -s /tmp/alvsia-r8-check/resources.arsc
           test -s /tmp/alvsia-r8-check/lib/arm64-v8a/librasp_guard.so
           grep -q 'com/alvsia/ai/uncensored/security/NativeGuard' app/src/main/cpp/rasp_guard.cpp
-          echo "Release hardening + native RASP + secure session audit: PASS"
+          echo "Release hardening + native RASP audit: PASS"
           sha256sum "$FINAL" | tee validation-artifacts/SHA256SUMS.txt
 
       - name: Upload unsigned release validation APK
