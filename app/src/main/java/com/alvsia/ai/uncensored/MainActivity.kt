@@ -551,55 +551,6 @@ private fun BottomItem(label: String, active: Boolean) {
     }
 }
 
-@Composable
-private fun LoginExperience(
-    license: String,
-    onLicense: (String) -> Unit,
-    busy: Boolean,
-    error: String?,
-    onLogin: () -> Unit
-) {
-    Box(
-        Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF26114D), Deep, Ink), radius = 900f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Image(painterResource(R.drawable.alvsia_ai_logo), null, modifier = Modifier.size(132.dp).clip(CircleShape))
-            Spacer(Modifier.height(20.dp))
-            Text("ALVSIA", color = Violet2, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 5.sp)
-            Text("UNCENSORED AI", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Black)
-            Text("PERSONAL AI OPERATING SYSTEM", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
-            Spacer(Modifier.height(26.dp))
-            Surface(modifier = Modifier.fillMaxWidth(), color = Color(0xE90F1223), shape = RoundedCornerShape(25.dp)) {
-                Column(Modifier.padding(22.dp)) {
-                    Text("SECURE ACCESS", color = Cyan, fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 1.5.sp)
-                    Text("ENTER YOUR ACCESS KEY", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-                    Spacer(Modifier.height(15.dp))
-                    OutlinedTextField(
-                        value = license, onValueChange = onLicense,
-                        modifier = Modifier.fillMaxWidth(), singleLine = true,
-                        label = { Text("License key") },
-                        visualTransformation = PasswordVisualTransformation()
-                    )
-                    if (!error.isNullOrBlank()) {
-                        Spacer(Modifier.height(9.dp))
-                        Text(error, color = Color(0xFFFF8C9A), fontSize = 11.sp)
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Button(
-                        onClick = onLogin, enabled = !busy && license.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(15.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Violet, contentColor = Color.White)
-                    ) {
-                        Text(if (busy) "AUTHENTICATING…" else "ENTER ALVSIA", fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
-                    }
-                }
-            }
-        }
-    }
-}
-
 private fun formatBytes(bytes: Long): String {
     if (bytes < 0) return "unknown size"
     if (bytes < 1024) return bytes.toString() + " B"
