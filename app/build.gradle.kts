@@ -13,8 +13,8 @@ android {
         applicationId = "com.alvsia.ai.uncensored"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
         buildConfigField("String", "CERT_SHA256", "\"99b33815c88a17abbcfe22be15250363f6dfc79c11ffc980e71b62b74b1f295c\"")
         ndk { abiFilters += listOf("arm64-v8a") }
     }
