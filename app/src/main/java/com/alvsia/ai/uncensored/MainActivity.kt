@@ -50,7 +50,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.alvsia.ai.uncensored.security.ApkIntegrity
 import com.alvsia.ai.uncensored.security.RuntimeGuard
-import com.alvsia.ai.uncensored.security.SessionGuard
 import com.alvsia.ai.uncensored.security.ThreatReporter
 
 private val Ink = Color(0xFF03050B)
