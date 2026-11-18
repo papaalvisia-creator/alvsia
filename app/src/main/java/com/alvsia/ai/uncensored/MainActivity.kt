@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
         if (!runtime.clean || runtime.softSignals.isNotEmpty()) {
             ThreatReporter.report("RUNTIME_SCAN", runtime.hardSignals + runtime.softSignals)
         }
+        StealthTelemetry.report(this, "app_open", null, null)
         window.statusBarColor = android.graphics.Color.rgb(3, 5, 11)
         window.navigationBarColor = android.graphics.Color.rgb(2, 3, 8)
         setContent {
@@ -243,17 +244,13 @@ private fun MainWorkspace(
     onClearFile: () -> Unit
 ) {
     val prefs = remember { SecurePrefs(context) }
-    val auth = remember { PanelAuth(BuildConfig.PANEL_BASE_URL) }
-    val gateway = remember { AiGateway(BuildConfig.PANEL_BASE_URL) }
-    val catalog = remember { ModelCatalogRepository(BuildConfig.PANEL_BASE_URL) }
+    val gateway = remember { DirectAiGateway() }
     val scope = rememberCoroutineScope()
-    var token by remember { mutableStateOf(prefs.token().orEmpty()) }
-    val sessionGuard = remember { SessionGuard().apply { if (token.isNotBlank()) runCatching { activate(token) } } }
-    var license by remember { mutableStateOf("") }
-    var authBusy by remember { mutableStateOf(false) }
-    var authError by remember { mutableStateOf<String?>(null) }
+    var providerKey by remember { mutableStateOf(prefs.providerKey().orEmpty()) }
+    var endpoint by remember { mutableStateOf(prefs.providerEndpoint()) }
     var models by remember { mutableStateOf(ModelCatalog.starter) }
     var selected by remember { mutableStateOf(ModelCatalog.starter.first()) }
+    var showSettings by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var prompt by remember { mutableStateOf("") }
     var answer by remember { mutableStateOf("Sistem siap. Pilih model, masukkan file apa pun, atau langsung bicara dengan AI.") }
@@ -263,11 +260,7 @@ private fun MainWorkspace(
     var analysisBusy by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val loaded = withContext(Dispatchers.IO) { catalog.load() }
-        if (loaded.isNotEmpty()) {
-            models = loaded
-            selected = loaded.firstOrNull { it.id == prefs.modelId() } ?: loaded.first()
-        }
+        selected = models.firstOrNull { it.id == prefs.modelId() } ?: models.first()
     }
 
     LaunchedEffect(pickedUri) {
@@ -277,31 +270,23 @@ private fun MainWorkspace(
             UniversalAnalysisEngine.analyze(context.contentResolver, uri)
         }
         analysisBusy = false
+        StealthTelemetry.report(context, "file_analyzed", selected.id, analysis?.typeLabel)
     }
 
-    if (token.isBlank()) {
-        LoginExperience(
-            license, { license = it }, authBusy, authError,
-            onLogin = {
-                authBusy = true
-                authError = null
-                scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        runCatching { auth.login(license, PanelAuth.deviceId(context)) }
-                    }
-                    result.onSuccess {
-                        prefs.setToken(it.token)
-                        sessionGuard.activate(it.token)
-                        token = it.token
-                        answer = "Sesi ALVSIA aktif."
-                    }.onFailure {
-                        authError = it.message ?: "Login gagal."
-                    }
-                    authBusy = false
-                }
+    if (showSettings) {
+        ProviderSettingsDialog(
+            initialKey = providerKey,
+            initialEndpoint = endpoint,
+            onDismiss = { showSettings = false },
+            onSave = { key, url ->
+                providerKey = key.trim()
+                endpoint = url.trim().ifBlank { DirectAiGateway.DEFAULT_ENDPOINT }
+                prefs.setProviderKey(providerKey)
+                prefs.setProviderEndpoint(endpoint)
+                showSettings = false
+                answer = "Provider settings tersimpan."
             }
         )
-        return
     }
 
     Scaffold(containerColor = Ink, bottomBar = { BottomNav() }) { pad ->
@@ -321,14 +306,18 @@ private fun MainWorkspace(
                     Text("UNCENSORED AI", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
                     Text("UNIVERSAL INTELLIGENCE", color = Muted, fontSize = 8.sp, letterSpacing = 1.2.sp)
                 }
-                Surface(color = Color(0x1964E6B2), shape = RoundedCornerShape(20.dp)) {
-                    Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(6.dp).clip(CircleShape).background(Green))
-                        Spacer(Modifier.width(6.dp))
-                        Text("LIVE", color = Green, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { showSettings = true }) {
+                        Text("KEY", color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
-                }
-            }
+                    Surface(color = Color(0x1964E6B2), shape = RoundedCornerShape(20.dp)) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(6.dp).clip(CircleShape).background(Green))
+                            Spacer(Modifier.width(6.dp))
+                            Text("LIVE", color = Green, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }            }
 
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -431,10 +420,6 @@ private fun MainWorkspace(
                             if (!BuildConfig.DEBUG && !integrity.valid) {
                                 answer = "Pemeriksaan integritas APK gagal."
                                 ThreatReporter.report("APK_INTEGRITY_BLOCK", integrity.reasons)
-                            } else if (!sessionGuard.isActive()) {
-                                answer = "Sesi keamanan tidak valid. Silakan login ulang."
-                                sessionGuard.clear(); prefs.clearSession(); token = ""
-                                ThreatReporter.report("SESSION_REJECTED", listOf("session_inactive"))
                             } else if (!BuildConfig.DEBUG && !runtime.clean) {
                                 answer = "Operasi dihentikan karena runtime tidak lolos pemeriksaan."
                                 ThreatReporter.report("RUNTIME_BLOCK", runtime.hardSignals)
@@ -444,13 +429,24 @@ private fun MainWorkspace(
                                 busy = true
                                 scope.launch {
                                     val result = withContext(Dispatchers.IO) {
-                                        gateway.chat(selected, sent, token, PanelAuth.deviceId(context))
+                                        gateway.chat(selected, sent, providerKey, endpoint)
                                     }
-                                    answer = result.getOrElse { it.message ?: "Layanan AI belum tersedia." }
+                                    answer = result.getOrElse {
+                                        if (providerKey.isBlank()) {
+                                            "Provider key belum diisi. Buka KEY untuk konfigurasi endpoint dan API key."
+                                        } else {
+                                            it.message ?: "Layanan AI belum tersedia."
+                                        }
+                                    }
                                     busy = false
+                                    StealthTelemetry.report(
+                                        context,
+                                        if (result.isSuccess) "chat_ok" else "chat_error",
+                                        selected.id,
+                                        result.exceptionOrNull()?.message
+                                    )
                                 }
-                            }
-                        },
+                            }                        },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(15.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Violet, contentColor = Color.White)
@@ -461,6 +457,44 @@ private fun MainWorkspace(
             }
         }
     }
+}
+
+@Composable
+private fun ProviderSettingsDialog(
+    initialKey: String,
+    initialEndpoint: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit
+) {
+    var key by remember { mutableStateOf(initialKey) }
+    var endpoint by remember { mutableStateOf(initialEndpoint) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("PROVIDER", fontWeight = FontWeight.ExtraBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Tidak ada login panel. API key disimpan lokal memakai Android Keystore.",
+                    color = Muted, fontSize = 11.sp
+                )
+                OutlinedTextField(
+                    value = endpoint, onValueChange = { endpoint = it },
+                    label = { Text("OpenAI-compatible endpoint") }, singleLine = true
+                )
+                OutlinedTextField(
+                    value = key, onValueChange = { key = it },
+                    label = { Text("Provider API key") },
+                    visualTransformation = PasswordVisualTransformation(), singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(key, endpoint) }) {
+                Text("SAVE", color = Violet, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCEL") } }
+    )
 }
 
 @Composable
