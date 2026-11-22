@@ -32,17 +32,22 @@ private val STMuted = Color(0xFF9AA7C1)
 
 class SmartToolActivity : ComponentActivity() {
     private var selectedUri by mutableStateOf<Uri?>(null)
-    private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { selectedUri = it }
+    private var secondaryUri by mutableStateOf<Uri?>(null)
+    private var pickingSecondary = false
+    private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) {
+        if (pickingSecondary) secondaryUri = it else selectedUri = it
+        pickingSecondary = false
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { AlvsiaTheme { SmartToolScreen(selectedUri, { picker.launch(arrayOf("*/*")) }, { selectedUri = null }) } }
+        setContent { AlvsiaTheme { SmartToolScreen(selectedUri, { pickingSecondary = false; picker.launch(arrayOf("*/*")) }, { selectedUri = null; secondaryUri = null }, secondaryUri, { pickingSecondary = true; picker.launch(arrayOf("*/*")) }) } }
     }
 }
 
 @Composable
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) {
+private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit, secondaryUri: Uri?, onPickSecondary: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var report by remember { mutableStateOf<SmartFileReport?>(null) }
@@ -125,14 +130,50 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                         ToolActionCard("LUA PROTECT", "Protection pipeline dari sumber Lua; output non-destruktif.") {
                             if (uri == null) onPick() else scope.launch { busy = true; try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua_protect").toString(2) } } catch (e: Exception) { log = "LUA PROTECT • " + (e.message ?: "engine belum tersedia") }; busy = false }
                         }
-                        ToolActionCard("LUA CUSTOM INJECT", "Custom injection route untuk pipeline Lua/PAK.") {
+                        ToolActionCard("LUA CUSTOM INJECT", "Pilih Lua lalu pilih target PAK. Backend menjalankan injeksi nyata dan menghasilkan PAK baru.") {
+                            if (uri == null) onPick()
+                            else if (secondaryUri == null) { onPickSecondary(); log = "Pilih TARGET PAK untuk Lua injection." }
+                            else scope.launch {
+                                busy = true
+                                try {
+                                    val out = File(context.cacheDir, "smart_lua_injected_" + System.currentTimeMillis() + ".pak")
+                                    log = withContext(Dispatchers.IO) { SmartToolEngine.runLuaCustomInject(context, uri, secondaryUri, out).toString(2) }
+                                } catch (e: Exception) { log = "LUA CUSTOM INJECT ERROR • " + (e.message ?: "unknown") }
+                                busy = false
+                            }
+                        }
+                        ToolActionCard("LUA T24 / BGMI CONVERT", "Konversi bytecode T24/BGMI ke bentuk standard Lua 5.3.") {
+                            if (uri == null) onPick() else scope.launch {
+                                busy = true
+                                try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua_t24_convert").toString(2) } }
+                                catch (e: Exception) { log = "LUA CONVERT ERROR • " + (e.message ?: "unknown") }
+                                busy = false
+                            }
+                        }
+                        ToolActionCard("LUA MULTI-XOR", "Uji kandidat XOR multi-byte yang tersedia tanpa mengubah input.") {
+                            if (uri == null) onPick() else scope.launch {
+                                busy = true
+                                try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua_multi_xor").toString(2) } }
+                                catch (e: Exception) { log = "LUA XOR ERROR • " + (e.message ?: "unknown") }
+                                busy = false
+                            }
+                        }
                             if (uri == null) onPick() else scope.launch { busy = true; try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua_custom_inject").toString(2) } } catch (e: Exception) { log = "LUA CUSTOM INJECT • " + (e.message ?: "engine belum tersedia") }; busy = false }
                         }
                         lua?.let { LuaCard(it) }
                     }
                 }
                 "PAK / OBB", "PAK" -> {
-                    ToolActionCard("PAK ANALYZE / EXTRACT", "UE4 PAK dikenali; ZIP-compatible fixture dapat diekstrak aman.") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ToolActionCard("PAK INFO", "Baca versi, index encryption, mount point, jumlah entry dan path.") {
+                        if (uri == null) onPick() else scope.launch {
+                            busy=true
+                            try { log=withContext(Dispatchers.IO){SmartToolEngine.runOperation(context,uri,"pak_info").toString(2)} }
+                            catch(e:Exception){log="PAK INFO ERROR • "+(e.message?:"unknown")}
+                            busy=false
+                        }
+                    }
+                    ToolActionCard("PAK ANALYZE / EXTRACT", "Ekstraksi PAK nyata melalui TencentPakFile; output non-destruktif.") {
                         if (uri == null) onPick() else scope.launch {
                             busy = true
                             try {
@@ -150,6 +191,19 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                             } catch (e: Exception) { log = "PAK ERROR • ${e.message ?: "unknown"}" }
                             busy = false
                         }
+                    }
+                    ToolActionCard("PAK LUA INJECT", "Masukkan Lua ke PAK target dengan backend injeksi Smart Tool.") {
+                        if (uri == null) onPick()
+                        else if (secondaryUri == null) { onPickSecondary(); log="Pilih TARGET PAK." }
+                        else scope.launch {
+                            busy=true
+                            try {
+                                val out=File(context.cacheDir,"smart_pak_lua_"+System.currentTimeMillis()+".pak")
+                                log=withContext(Dispatchers.IO){SmartToolEngine.runLuaCustomInject(context,uri,secondaryUri,out).toString(2)}
+                            } catch(e:Exception){log="PAK INJECT ERROR • "+(e.message?:"unknown")}
+                            busy=false
+                        }
+                    }
                     }
                 }
                 "ASSET / UE", "ASSET" -> {
@@ -195,9 +249,9 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                 }
                 else -> {
                     val menu = when (section) {
-                        "APK / DEX" -> listOf("APK ANALYSIS" to "analyze", "DEX / BYTECODE" to "file_report", "APK STRINGS / URL" to "strings", "PACKAGE / SIGNATURE AUDIT" to "file_report")
-                        "NATIVE" -> listOf("ELF / SO ANALYZER" to "file_report", "NATIVE STRINGS / SYMBOLS" to "strings", "DEPENDENCY / ABI AUDIT" to "file_report")
-                        "CRYPTO / RECOVERY" -> listOf("SM4 / ZUC / AES ANALYSIS" to "forensics", "XOR / MULTI-XOR RECOVERY" to "forensics", "KEY / IV CANDIDATE SCAN" to "forensics", "COMPRESSION / LAYER RECOVERY" to "forensics")
+                        "APK / DEX" -> listOf("APK ANALYSIS" to "apk_audit", "DEX / BYTECODE" to "file_report", "APK STRINGS / URL" to "url_scan", "PACKAGE / SIGNATURE AUDIT" to "apk_audit")
+                        "NATIVE" -> listOf("ELF / SO ANALYZER" to "so_audit", "NATIVE STRINGS / SYMBOLS" to "strings", "DEPENDENCY / ABI AUDIT" to "file_report")
+                        "CRYPTO / RECOVERY" -> listOf("AES CANDIDATE SCAN" to "aes_scan", "STRING RECOVERY" to "string_recover", "URL / ENDPOINT SCAN" to "url_scan", "COMPRESSION / LAYER RECOVERY" to "forensics")
                         else -> listOf("BATCH AUDIT / CLASSIFY" to "batch_audit", "COMPARE / REGRESSION" to "batch_audit", "SELF TEST / ENGINE HEALTH" to "self_test")
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
