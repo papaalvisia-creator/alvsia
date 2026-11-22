@@ -112,24 +112,24 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                     FeatureCard("AUDIT", "SHA-256 • operation report • zip-slip protection • explicit unsupported states")
                 }
                 "LUA" -> {
-                    ToolActionCard("LUA SMART DECOMPILE", "Deteksi header, versi, source/bytecode dan kandidat obfuscation.") {
-                        if (uri == null) onPick() else scope.launch {
-                            busy = true
-                            val result = withContext(Dispatchers.IO) {
-                                SmartToolEngine.runOperation(context, uri, "lua")
-                            }
-                            log = result.toString(2)
-                            val bytes = withContext(Dispatchers.IO) {
-                                context.contentResolver.openInputStream(uri)?.use { input ->
-                                    val b = ByteArray(65536); val n = input.read(b)
-                                    if (n > 0) b.copyOf(n) else ByteArray(0)
-                                } ?: ByteArray(0)
-                            }
-                            lua = SmartToolEngine.inspectLua(bytes)
-                            busy = false
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ToolActionCard("LUA SMART ANALYZE", "Deteksi source, bytecode, LuaJIT, header dan obfuscation.") {
+                            if (uri == null) onPick() else scope.launch { busy = true; try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua").toString(2) } } catch (e: Exception) { log = "LUA ANALYZE ERROR • " + (e.message ?: "unknown") }; busy = false }
                         }
+                        ToolActionCard("LUA RECOVERY / CONVERSION", "Normalisasi, BGMI/T24 conversion dan header recovery.") {
+                            if (uri == null) onPick() else scope.launch { busy = true; try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua").toString(2) } } catch (e: Exception) { log = "RECOVERY ERROR • " + (e.message ?: "unknown") }; busy = false }
+                        }
+                        ToolActionCard("LUA MULTI-BACKEND DECOMPILE", "Smart decompile dengan routing backend yang tersedia.") {
+                            if (uri == null) onPick() else scope.launch { busy = true; try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua").toString(2) } } catch (e: Exception) { log = "DECOMPILE ERROR • " + (e.message ?: "unknown") }; busy = false }
+                        }
+                        ToolActionCard("LUA PROTECT", "Protection pipeline dari sumber Lua; output non-destruktif.") {
+                            if (uri == null) onPick() else scope.launch { busy = true; try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua_protect").toString(2) } } catch (e: Exception) { log = "LUA PROTECT • " + (e.message ?: "engine belum tersedia") }; busy = false }
+                        }
+                        ToolActionCard("LUA CUSTOM INJECT", "Custom injection route untuk pipeline Lua/PAK.") {
+                            if (uri == null) onPick() else scope.launch { busy = true; try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua_custom_inject").toString(2) } } catch (e: Exception) { log = "LUA CUSTOM INJECT • " + (e.message ?: "engine belum tersedia") }; busy = false }
+                        }
+                        lua?.let { LuaCard(it) }
                     }
-                    lua?.let { LuaCard(it) }
                 }
                 "PAK / OBB", "PAK" -> {
                     ToolActionCard("PAK ANALYZE / EXTRACT", "UE4 PAK dikenali; ZIP-compatible fixture dapat diekstrak aman.") {
@@ -206,11 +206,8 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                             ToolActionCard(item.first, "ALVSIA Smart Engine • non-destructive routing • explicit result.") {
                                 if (uri == null) onPick() else scope.launch {
                                     busy = true
-                                    try {
-                                        log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, item.second).toString(2) }
-                                    } catch (e: Exception) {
-                                        log = item.first + " ERROR • " + (e.message ?: "engine unavailable")
-                                    }
+                                    try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, item.second).toString(2) } }
+                                    catch (e: Exception) { log = item.first + " ERROR • " + (e.message ?: "engine unavailable") }
                                     busy = false
                                 }
                             }
