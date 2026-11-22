@@ -153,7 +153,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                     ToolActionCard("BATCH / AUDIT", "Analisis file, hash, klasifikasi dan laporan.") {
                         if (uri == null) onPick() else scope.launch {
                             busy = true
-                            report = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context.contentResolver, uri) }
+                            report = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context, uri) }
                             log = report?.let { SmartToolEngine.batchClassify(context.contentResolver, uri) } ?: "Tidak ada laporan"
                             busy = false
                         }
