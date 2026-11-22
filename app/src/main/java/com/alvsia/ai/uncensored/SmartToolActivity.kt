@@ -141,7 +141,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                                     log = result.toString(2)
                                 } else if (r.type == "ZIP_CONTAINER") {
                                     val out = File(context.cacheDir, "smart_extract_${System.currentTimeMillis()}")
-                                    val count = withContext(Dispatchers.IO) { SmartToolEngine.extractZip(context.contentResolver, uri, out) }
+                                    val count = withContext(Dispatchers.IO) { SmartToolEngine.extractZip(context, uri, out) }
                                     log = "EXTRACT OK • $count entries • ${out.name}"
                                 } else log = r.detail
                             } catch (e: Exception) { log = "PAK ERROR • ${e.message ?: "unknown"}" }
