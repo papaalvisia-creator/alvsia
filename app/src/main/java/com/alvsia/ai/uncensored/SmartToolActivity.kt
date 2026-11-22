@@ -41,6 +41,7 @@ class SmartToolActivity : ComponentActivity() {
 }
 
 @Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -57,7 +58,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
         lua = null
         busy = false
         report?.let {
-            log = "DETECT OK • \${it.type} • SHA-256 \${it.sha256.take(16)}…"
+            log = "DETECT OK • ${it.type} • SHA-256 ${it.sha256.take(16)}…"
             if (it.type == "LUA") {
                 val head = withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(u)?.use { input ->
@@ -132,11 +133,11 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                                 val r = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context.contentResolver, uri) }
                                 report = r
                                 if (r.type == "ZIP/APK/JAR/AAB") {
-                                    val out = File(context.cacheDir, "smart_extract_\${System.currentTimeMillis()}")
+                                    val out = File(context.cacheDir, "smart_extract_${System.currentTimeMillis()}")
                                     val count = withContext(Dispatchers.IO) { SmartToolEngine.extractZip(context.contentResolver, uri, out) }
-                                    log = "EXTRACT OK • \$count entries • \${out.name}"
+                                    log = "EXTRACT OK • $count entries • ${out.name}"
                                 } else log = r.detail
-                            } catch (e: Exception) { log = "PAK ERROR • \${e.message ?: "unknown"}" }
+                            } catch (e: Exception) { log = "PAK ERROR • ${e.message ?: "unknown"}" }
                             busy = false
                         }
                     }
@@ -178,10 +179,10 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
     Surface(color = Color(0xFF11152A), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
         Column(Modifier.padding(13.dp)) {
             Text("LUA DIAGNOSTIC", color = STCyan, fontWeight = FontWeight.Bold)
-            Text("\${r.kind} • \${r.version}", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("${r.kind} • ${r.version}", color = Color.White, fontWeight = FontWeight.Bold)
             Text(r.header, color = STMuted, fontSize = 9.sp)
             Text(r.detail, color = Color(0xFFD8D8E8), fontSize = 10.sp)
-            if (r.xorCandidates.isNotEmpty()) Text("Candidates: \${r.xorCandidates.joinToString()}", color = STViolet, fontSize = 9.sp)
+            if (r.xorCandidates.isNotEmpty()) Text("Candidates: ${r.xorCandidates.joinToString()}", color = STViolet, fontSize = 9.sp)
         }
     }
 }
@@ -195,7 +196,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                 TextButton(onClick = clear) { Text("CLEAR", color = STMuted, fontSize = 9.sp) }
             }
             Text(r.name, color = Color.White, fontWeight = FontWeight.Bold)
-            Text("\${r.size} bytes • SHA-256 \${r.sha256.take(16)}…", color = STMuted, fontSize = 9.sp)
+            Text("${r.size} bytes • SHA-256 ${r.sha256.take(16)}…", color = STMuted, fontSize = 9.sp)
             Text(r.detail, color = Color(0xFFD8D8E8), fontSize = 10.sp)
         }
     }
