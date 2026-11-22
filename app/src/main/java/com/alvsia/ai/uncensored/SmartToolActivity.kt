@@ -54,7 +54,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
     LaunchedEffect(uri) {
         val u = uri ?: return@LaunchedEffect
         busy = true
-        report = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context.contentResolver, u) }
+        report = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context, u) }
         lua = null
         busy = false
         report?.let {
