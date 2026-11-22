@@ -158,8 +158,6 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit, 
                                 busy = false
                             }
                         }
-                            if (uri == null) onPick() else scope.launch { busy = true; try { log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "lua_custom_inject").toString(2) } } catch (e: Exception) { log = "LUA CUSTOM INJECT • " + (e.message ?: "engine belum tersedia") }; busy = false }
-                        }
                         lua?.let { LuaCard(it) }
                     }
                 }
