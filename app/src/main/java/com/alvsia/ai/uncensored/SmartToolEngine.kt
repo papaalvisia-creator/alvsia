@@ -168,7 +168,7 @@ object SmartToolEngine {
         val t = s.trimStart()
         if (t.startsWith("--") || t.startsWith("local ") || t.startsWith("function ") || t.startsWith("return ")) return true
         val score = listOf("function", "local", "end", "then", "return").count { s.contains(it) }
-        return score >= 2 && s.count { it == '\\u0000' } < 3
+        return score >= 2 && s.count { it == '\u0000' } < 3
     }
 
     private fun safeResolve(root: File, entry: String): File {
@@ -178,5 +178,5 @@ object SmartToolEngine {
         return target
     }
 
-    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+    private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it.toInt() and 0xFF) }
 }
