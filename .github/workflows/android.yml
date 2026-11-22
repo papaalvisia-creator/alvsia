@@ -1,4 +1,4 @@
-name: ALVSIA AI UNCENSORED Android
+name: ALVSIA SMART TOOL Android
 # Release signing accepts normalized Base64 keystore secrets.
 # Release gate: build -> sign -> verify -> artifact
 
@@ -22,6 +22,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
@@ -143,10 +147,10 @@ jobs:
           test -x "$APKSIGNER"
 
           echo "Signing release APK with existing keystore..."
-          "$APKSIGNER" sign --ks "$KS" --ks-key-alias "$ALIAS" --ks-pass env:KSPASS --key-pass env:KEYPASS --out validation-artifacts/ALVSIA_AI_UNCENSORED_0.7.0_signed.apk "$INPUT"
+          "$APKSIGNER" sign --ks "$KS" --ks-key-alias "$ALIAS" --ks-pass env:KSPASS --key-pass env:KEYPASS --out validation-artifacts/ALVSIA_SMART_TOOL_1.0.0_signed.apk "$INPUT"
 
-          test -s validation-artifacts/ALVSIA_AI_UNCENSORED_0.7.0_signed.apk
-          FINAL="validation-artifacts/ALVSIA_AI_UNCENSORED_0.7.0_signed.apk"
+          test -s validation-artifacts/ALVSIA_SMART_TOOL_1.0.0_signed.apk
+          FINAL="validation-artifacts/ALVSIA_SMART_TOOL_1.0.0_signed.apk"
           VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --print-certs "$FINAL" 2>&1)"
           printf '%s\n' "$VERIFY_OUTPUT"
           EXPECTED_CERT="$(grep -oE '[0-9a-fA-F]{64}' app/build.gradle.kts | head -n 1 | tr '[:upper:]' '[:lower:]')"
@@ -183,7 +187,7 @@ jobs:
         if: steps.signing.outputs.available != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ALVSIA_AI_UNCENSORED_0.7.0-release-validation
+          name: ALVSIA_SMART_TOOL_1.0.0-release-validation
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
@@ -191,8 +195,8 @@ jobs:
         if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ALVSIA_AI_UNCENSORED_0.7.0-final
+          name: ALVSIA_SMART_TOOL_1.0.0-final
           path: |
-            validation-artifacts/ALVSIA_AI_UNCENSORED_0.7.0_signed.apk
+            validation-artifacts/ALVSIA_SMART_TOOL_1.0.0_signed.apk
             validation-artifacts/SHA256SUMS.txt
           if-no-files-found: error
