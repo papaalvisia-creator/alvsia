@@ -58,6 +58,13 @@ def lua_protect(src,output=None,options=None):
     dst=out/(src.stem+".alvslua"); dst.write_bytes(header+mac+payload)
     return {"engine":ENGINE,"operation":"lua_protect","status":"protected","backend":"alvsia-container-v2","input":str(src),"input_sha256":sha256(src),"output":str(dst),"output_sha256":sha256(dst),"output_size":dst.stat().st_size}
 
+def lua_custom_inject(src,output=None,options=None):
+    options=options or {}
+    target=options.get("target_pak") or options.get("pak")
+    if not target: raise ValueError("lua_custom_inject requires a target PAK path")
+    pak=Path(target); out=Path(output) if output else pak.parent/(pak.stem+"_lua_injected"+pak.suffix)
+    return pak_inject(pak,[{"path":str(src),"target_path":options.get("target_path") or Path(src).name}],out)
+
 def pak_info(src):
     from alvsia_engine import TencentPakFile
     src=Path(src); p=TencentPakFile(src)
@@ -91,6 +98,7 @@ def run(src,operation="analyze",output=None,options=None):
     if operation in ("analyze","detect"): return analyze(src)
     if operation in ("lua","decompile","lua_decompile"): return lua_decompile(src,output)
     if operation=="lua_protect": return lua_protect(src,output,options)
+    if operation=="lua_custom_inject": return lua_custom_inject(src,output,options)
     typ=detect(src)
     if operation=="pak_info" and typ=="UE4_PAK": return pak_info(src)
     if operation=="pak_extract" and typ=="UE4_PAK": return pak_extract(src,output or _out(None,src)/"extract")
