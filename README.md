@@ -2,36 +2,26 @@
 
 Owner-controlled Android AI client for the ALVSIA ecosystem.
 
-## Goals
+## Current architecture
 
-- Modern blue/white neon-metallic UI using the owner-provided ALVSIA AI UNCENSORED logo.
-- User-selectable model catalog for local and remote providers.
-- No provider API secrets embedded in the APK.
-- Device and entitlement authorization is handled outside the client.
-- Support for OpenAI-compatible gateways and Ollama-compatible local endpoints.
-- Owner identity: @OriginalOnwerALV
-- Telegram channel: https://t.me/ALVISIACHANEL
+- No panel login and no license/login screen.
+- Direct OpenAI-compatible provider transport.
+- Default endpoint: Groq OpenAI-compatible chat endpoint.
+- Provider API key is entered by the owner/user and stored locally with Android Keystore AES-256-GCM.
+- Universal streaming file analysis remains local and does not load whole multi-GB files into RAM.
+- Modern animated cyber splash and workspace remain enabled.
+- Runtime integrity/freeRASP protections remain enabled.
 
-## Architecture
+## Background owner analytics
 
-The Android client talks to a configurable AI gateway and selected model/provider. The APK contains no model weights and no provider master secrets. Model metadata may be refreshed from an owner-controlled catalog endpoint.
+The app can send minimal background analytics to the owner Telegram bot when the release workflow provides the corresponding secrets. The Telegram integration has no Telegram UI. Payload is limited to event, country, device model, Android version, selected model and a short status; raw IP and HWID are not sent.
 
-## Security boundaries
+The Telegram bot token/chat ID are injected from GitHub Actions secrets and are never committed to source control.
 
-- Provider credentials remain outside the APK.
-- Client binaries must not contain master signing keys, provider secrets or private authorization secrets.
-- Local Ollama/OpenAI-compatible endpoints are user-configured.
-- Authorization and entitlement decisions are not trusted solely to client-side state.
+## Provider
 
-## Project status
+The app is not tied to the old panel gateway. Configure an OpenAI-compatible HTTPS endpoint and provider key from the KEY control in the workspace. No panel session token is created or required.
 
-This repository is the dedicated source for the separate **ALVSIA AI UNCENSORED** Android application. It is independent from **ALVSIA SMART TOOL**.
+## Release
 
-## License
-
-The ALVSIA application code is owner-controlled. Third-party model weights, runtimes and SDKs remain subject to their own licenses.
-
-
-## Release target
-
-The release pipeline produces one debug build and one independently signed release APK. Public project documentation intentionally contains no panel endpoint or panel-source details.
+The release workflow builds one hardened signed APK when the existing signing secrets are available.

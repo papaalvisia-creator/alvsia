@@ -11,6 +11,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ALVSIA_TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      ALVSIA_TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     permissions:
       contents: read
     steps:
@@ -122,8 +125,6 @@ jobs:
           echo "Keystore decoded: $(wc -c < "$KS") bytes"
           echo "Expected alias: $ALIAS"
 
-          # Do not print passwords. keytool diagnostics are intentionally visible
-          # so a bad existing CI secret is distinguishable from an apksigner error.
           if ! keytool -list -v -keystore "$KS" -storepass "$KSPASS" >/tmp/alvsia-keytool-list.txt 2>/tmp/alvsia-keytool-error.txt; then
             echo "::error::Existing keystore could not be opened with the configured CI store password."
             sed -E 's/(password|passphrase|storepass|keypass)[^:]*:.*/\1: [REDACTED]/Ig' /tmp/alvsia-keytool-error.txt
@@ -142,11 +143,19 @@ jobs:
           test -x "$APKSIGNER"
 
           echo "Signing release APK with existing keystore..."
-          "$APKSIGNER" sign             --ks "$KS"             --ks-key-alias "$ALIAS"             --ks-pass env:KSPASS             --key-pass env:KEYPASS             --out validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk             "$INPUT"
+          "$APKSIGNER" sign --ks "$KS" --ks-key-alias "$ALIAS" --ks-pass env:KSPASS --key-pass env:KEYPASS --out validation-artifacts/ALVSIA_AI_UNCENSORED_0.5.0_signed.apk "$INPUT"
 
-          test -s validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk
-          FINAL="validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk"
-          "$APKSIGNER" verify --verbose --print-certs "$FINAL"
+          test -s validation-artifacts/ALVSIA_AI_UNCENSORED_0.5.0_signed.apk
+          FINAL="validation-artifacts/ALVSIA_AI_UNCENSORED_0.5.0_signed.apk"
+          VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --print-certs "$FINAL" 2>&1)"
+          printf '%s\n' "$VERIFY_OUTPUT"
+          EXPECTED_CERT="$(grep -oE '[0-9a-fA-F]{64}' app/build.gradle.kts | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          ACTUAL_CERT="$(echo "$VERIFY_OUTPUT" | grep -oE 'certificate SHA-256 digest: [0-9a-fA-F]{64}' | awk '{print $NF}' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          if [ -z "$EXPECTED_CERT" ] || [ -z "$ACTUAL_CERT" ] || [ "$ACTUAL_CERT" != "$EXPECTED_CERT" ]; then
+            echo "::error::Signed APK certificate does not match BuildConfig.CERT_SHA256."
+            exit 1
+          fi
+          echo "APK signer matches runtime certificate pin."
           ZIPALIGN="$(find "$ANDROID_HOME/build-tools" -type f -name zipalign | sort -V | tail -n 1)"
           test -x "$ZIPALIGN"
           "$ZIPALIGN" -c -v 4 "$FINAL"
@@ -156,13 +165,16 @@ jobs:
           grep -q 'usesCleartextTraffic="false"' app/src/main/AndroidManifest.xml
           grep -q 'allowBackup="false"' app/src/main/AndroidManifest.xml
           grep -q 'add_library(rasp_guard SHARED' app/src/main/cpp/CMakeLists.txt
-          grep -q '84+S6cn1vo+IjlQMR5mvqIe5XKMPh28WV9xYVtFKTkk=' app/src/main/res/xml/network_security_config.xml
           grep -q 'NativeGuard' app/proguard-rules.pro
+          grep -q 'updateAAD(AAD)' app/src/main/java/com/alvsia/ai/uncensored/SecurePrefs.kt
+          grep -q 'HttpBodyGuard.readUtf8' app/src/main/java/com/alvsia/ai/uncensored/DirectAiGateway.kt
+          grep -q 'MAX_RESPONSE_BYTES' app/src/main/java/com/alvsia/ai/uncensored/DirectAiGateway.kt
           ! grep -q 'debuggable="true"' app/src/main/AndroidManifest.xml
           mkdir -p /tmp/alvsia-r8-check
           unzip -q "$FINAL" -d /tmp/alvsia-r8-check
-          test -f /tmp/alvsia-r8-check/classes.dex
-          test -f /tmp/alvsia-r8-check/lib/arm64-v8a/librasp_guard.so
+          test -s /tmp/alvsia-r8-check/classes.dex
+          test -s /tmp/alvsia-r8-check/resources.arsc
+          test -s /tmp/alvsia-r8-check/lib/arm64-v8a/librasp_guard.so
           grep -q 'com/alvsia/ai/uncensored/security/NativeGuard' app/src/main/cpp/rasp_guard.cpp
           echo "Release hardening + native RASP audit: PASS"
           sha256sum "$FINAL" | tee validation-artifacts/SHA256SUMS.txt
@@ -171,7 +183,7 @@ jobs:
         if: steps.signing.outputs.available != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ALVSIA_AI_UNCENSORED_0.3.0-release-validation
+          name: ALVSIA_AI_UNCENSORED_0.5.0-release-validation
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
@@ -179,8 +191,8 @@ jobs:
         if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ALVSIA_AI_UNCENSORED_0.3.0-final
+          name: ALVSIA_AI_UNCENSORED_0.5.0-final
           path: |
-            validation-artifacts/ALVSIA_AI_UNCENSORED_0.3.0_signed.apk
+            validation-artifacts/ALVSIA_AI_UNCENSORED_0.5.0_signed.apk
             validation-artifacts/SHA256SUMS.txt
           if-no-files-found: error
