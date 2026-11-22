@@ -3,7 +3,7 @@ import hashlib, json, math, os, shutil, tempfile, zipfile
 from pathlib import Path
 
 ENGINE = "ALVSIA SMART TOOL"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 def _sha256(path):
     h = hashlib.sha256()
@@ -43,7 +43,7 @@ def analyze(path):
 def capabilities(typ):
     if typ in ("LUA", "LUAJIT"):
         return ["detect", "normalize", "BGMI/Lua conversion", "multi-backend decompile",
-                "header recovery", "XOR/AES candidate recovery", "reconstruct", "roundtrip", "batch"]
+                "header recovery", "XOR/AES candidate recovery", "reconstruct", "roundtrip", "protect", "custom inject", "batch"]
     if typ == "UE4_PAK":
         return ["footer/index parse", "AES/SM4/ZUC/SIMPLE decrypt", "zlib/ZSTD/ZSTD-dict",
                 "extract", "inject", "repack", "verify"]
@@ -109,6 +109,8 @@ def run(path, operation="analyze", output=None, options=None):
     typ = _detect(p.name, _head(p))
     if operation in ("lua", "decompile", "lua_decompile") and typ in ("LUA", "LUAJIT"):
         return _lua(p, output or (p.parent / "alvsia_output"))
+    if operation in ("lua_protect", "lua_custom_inject"):
+        return {"engine": ENGINE, "operation": operation, "input": str(p), "status": "source-route-ready", "message": "Dedicated Lua adapter route is reserved for the TOOL pipeline; no destructive fallback is performed."}
     if operation.startswith("pak_") and typ == "UE4_PAK":
         return _pak(p, operation[4:], output, options.get("inject"))
     if operation == "zip_extract":
