@@ -38,6 +38,16 @@ object SmartToolEngine {
         return try { SmartPythonEngine.run(context,input,operation,output) } finally { input.delete() }
     }
 
+    fun runLuaCustomInject(context:Context, luaUri:Uri, pakUri:Uri, output:File?=null):JSONObject {
+        val luaInput=materialize(context,luaUri)
+        val pakInput=materialize(context,pakUri)
+        return try {
+            SmartPythonEngine.run(context,luaInput,"lua_custom_inject",output,mapOf("target_pak" to pakInput.absolutePath))
+        } finally {
+            luaInput.delete(); pakInput.delete()
+        }
+    }
+
     fun inspectLua(bytes:ByteArray):LuaReport {
         if(bytes.size>=4&&bytes.copyOfRange(0,4).contentEquals(byteArrayOf(0x1B,0x4C,0x75,0x61))){
             val v=if(bytes.size>4)"0x%02X".format(bytes[4]) else "unknown"
