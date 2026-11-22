@@ -85,10 +85,10 @@ def reference_op(src,op,output=None,options=None):
         fn=getattr(mod,"apk_audit",None)
         return {"engine":ENGINE,"operation":op,"results":fn(str(src)) if fn else {}}
     if op=="zuc_decrypt":
-        fn=getattr(mod,"zuc_decrypt",None)
-        if not fn: return {"ok":False,"engine":ENGINE,"operation":op,"message":"ZUC backend not exposed by current Android forensic adapter"}
+        zuc=getattr(mod,"ZUC",None)
+        if not zuc: return {"ok":False,"engine":ENGINE,"operation":op,"message":"ZUC backend not exposed by current Android forensic adapter"}
         key=bytes.fromhex(options["key"]); iv=bytes.fromhex(options["iv"]); dst=Path(output) if output else _out(None,src)/(Path(src).name+".zuc.dec")
-        dst.write_bytes(fn(data,key,iv)); return {"ok":True,"engine":ENGINE,"operation":op,"output":str(dst),"output_sha256":sha256(dst)}
+        dst.write_bytes(zuc(key,iv).encrypt(data)); return {"ok":True,"engine":ENGINE,"operation":op,"output":str(dst),"output_sha256":sha256(dst)}
     return {"ok":False,"engine":ENGINE,"operation":op,"message":"unsupported"}
 
 def pak_info(src):
