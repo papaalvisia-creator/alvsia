@@ -13,7 +13,7 @@
     <application
         android:name=".AlvsiaApplication"
         android:theme="@style/Theme.AlvsiaAI"
-        android:label="ALVSIA AI UNCENSORED"
+        android:label="ALVSIA SMART TOOL"
         android:icon="@drawable/alvsia_ai_logo"
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
