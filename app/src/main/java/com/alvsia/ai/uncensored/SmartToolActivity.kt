@@ -112,10 +112,13 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                     ToolActionCard("LUA SMART DECOMPILE", "Deteksi header, versi, source/bytecode dan kandidat obfuscation.") {
                         if (uri == null) onPick() else scope.launch {
                             busy = true
+                            val result = withContext(Dispatchers.IO) {
+                                SmartToolEngine.runOperation(context, uri, "lua")
+                            }
+                            log = result.toString(2)
                             val bytes = withContext(Dispatchers.IO) {
                                 context.contentResolver.openInputStream(uri)?.use { input ->
-                                    val b = ByteArray(65536)
-                                    val n = input.read(b)
+                                    val b = ByteArray(65536); val n = input.read(b)
                                     if (n > 0) b.copyOf(n) else ByteArray(0)
                                 } ?: ByteArray(0)
                             }
@@ -130,9 +133,13 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                         if (uri == null) onPick() else scope.launch {
                             busy = true
                             try {
-                                val r = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context.contentResolver, uri) }
+                                val r = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context, uri) }
                                 report = r
-                                if (r.type == "ZIP/APK/JAR/AAB") {
+                                if (r.type == "UE4_PAK") {
+                                    val out = File(context.cacheDir, "smart_pak_extract_${System.currentTimeMillis()}")
+                                    val result = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "pak_extract", out) }
+                                    log = result.toString(2)
+                                } else if (r.type == "ZIP_CONTAINER") {
                                     val out = File(context.cacheDir, "smart_extract_${System.currentTimeMillis()}")
                                     val count = withContext(Dispatchers.IO) { SmartToolEngine.extractZip(context.contentResolver, uri, out) }
                                     log = "EXTRACT OK • $count entries • ${out.name}"
