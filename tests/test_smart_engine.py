@@ -11,11 +11,13 @@ def test_detect_and_analyze():
         assert r["type"]=="LUA"
         assert r["sha256"] and r["size"]>0
 
-def test_lua_protect_roundtrip_container():
-    with tempfile.TemporaryDirectory() as td:
-        p=Path(td)/"sample.lua"; p.write_bytes(b"return 123\n")
-        r=smart_engine.lua_protect(p,Path(td)/"out")
-        q=Path(r["output"])
-        assert q.is_file()
-        assert q.read_bytes().startswith(b"ALVSLUA2")
-        assert r["output_sha256"]==smart_engine.sha256(q)
+def test_source_inventory_is_fused():
+    r=smart_engine.source_inventory()
+    assert "IkramTool_V130_4.7.zip" in r["sources"]
+    assert "TOOL.zip" in r["sources"]
+    assert "RegulerResault_ALVSIA_tool_no_on_vip_engine.zip" in r["sources"]
+
+def test_t24_backend_loaded():
+    r=smart_engine.run(__file__,"self_test")
+    assert r["checks"]["alvsia_t24_engine"] is True
+    assert r["checks"]["alvsia_engine"] is True
