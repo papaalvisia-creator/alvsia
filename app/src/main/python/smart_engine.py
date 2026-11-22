@@ -111,6 +111,14 @@ def pak_inject(src,items,output):
     TencentPakFile(src).inject_files(plan,out)
     return {"engine":ENGINE,"operation":"pak_inject","input":str(src),"output":str(out),"injected":len(plan),"input_sha256":sha256(src),"output_sha256":sha256(out),"output_size":out.stat().st_size}
 
+def lua_custom_inject(src,output=None,options=None):
+    options=options or {}
+    target=options.get("target_pak") or options.get("pak")
+    if not target: raise ValueError("lua_custom_inject requires target_pak")
+    pak=Path(target)
+    out=Path(output) if output else pak.parent/(pak.stem+"_lua_injected"+pak.suffix)
+    return pak_inject(pak,[{"path":str(src),"target_path":options.get("target_path") or Path(src).name}],out)
+
 def pak_repack(src,modified_dir,output):
     from alvsia_engine import TencentPakFile
     out=Path(output); out.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(src,out)
@@ -147,6 +155,7 @@ def run(src,operation="analyze",output=None,options=None):
     if operation in ("analyze","detect"): return analyze(src)
     if operation in ("lua","decompile","lua_decompile","lua_smart_analyze"): return lua_decompile(src,output)
     if operation in ("lua_protect","protek"): return lua_protect(src,output,options)
+    if operation=="lua_custom_inject": return lua_custom_inject(src,output,options)
     if operation in ("lua_t24_convert","pubg_lua_convert"): return lua_transform(src,output,True)
     if operation=="lua_multi_xor": return lua_multi_xor(src,output)
     if operation in ("lua_strings","priv_lua_parse"): return reference_op(src,"string_recover",output,options)
