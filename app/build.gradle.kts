@@ -35,7 +35,7 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     chaquopy {
         defaultConfig {
-            version = "3.14"
+            version = "3.13"
             pip {
                 install("gmalg==1.1.2")
                 install("pycryptodome")
