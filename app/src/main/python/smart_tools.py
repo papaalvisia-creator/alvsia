@@ -36,17 +36,17 @@ def hex_preview(path,limit=256):
 def signature(path):
     data=Path(path).read_bytes()[:64]
     sigs=[
-        (b"PK\\x03\\x04","ZIP"),(b"\\x1bLua","LUA"),(b"\\x1bLJ","LUAJIT"),
-        (b"\\x7fELF","ELF"),(b"MZ","PE"),(b"dex\\n","DEX"),(b"\\x5a\\x6f\\x12\\xe1","UE4_PAK")
+        (b"PK\x03\x04","ZIP"),(b"\x1bLua","LUA"),(b"\x1bLJ","LUAJIT"),
+        (b"\x7fELF","ELF"),(b"MZ","PE"),(b"dex\n","DEX"),(b"\x5a\x6f\x12\xe1","UE4_PAK")
     ]
     # literal escaped signatures above are intentionally corrected below
-    if data.startswith(b"PK\\x03\\x04"): typ="ZIP"
-    elif data.startswith(b"\\x1bLua"): typ="LUA"
-    elif data.startswith(b"\\x1bLJ"): typ="LUAJIT"
-    elif data.startswith(b"\\x7fELF"): typ="ELF"
+    if data.startswith(b"PK\x03\x04"): typ="ZIP"
+    elif data.startswith(b"\x1bLua"): typ="LUA"
+    elif data.startswith(b"\x1bLJ"): typ="LUAJIT"
+    elif data.startswith(b"\x7fELF"): typ="ELF"
     elif data.startswith(b"MZ"): typ="PE"
-    elif data.startswith(b"dex\\n"): typ="DEX"
-    elif data.startswith(b"\\x5a\\x6f\\x12\\xe1"): typ="UE4_PAK"
+    elif data.startswith(b"dex\n"): typ="DEX"
+    elif data.startswith(b"\x5a\x6f\x12\xe1"): typ="UE4_PAK"
     else: typ="UNKNOWN"
     return {"type":typ,"magic":data[:16].hex()}
 
