@@ -76,7 +76,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
         TopAppBar(
             title = { Column {
                 Text("SMART ALVSIA TOOL", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
-                Text("PAK • LUA • BATCH • ANALYSIS", color = STMuted, fontSize = 8.sp, letterSpacing = 1.2.sp)
+                Text("SMART CORE • PAK • LUA • ASSET • FORENSICS", color = STMuted, fontSize = 8.sp, letterSpacing = 1.2.sp)
             }},
             navigationIcon = { TextButton(onClick = { (context as? ComponentActivity)?.finish() }) { Text("BACK", color = STCyan, fontSize = 9.sp) } },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = STInk)
@@ -84,7 +84,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
     }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).background(Brush.verticalGradient(listOf(Color(0xFF0B0D1C), STInk))).padding(14.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf("HOME","LUA","PAK","BATCH").forEach { tab ->
+                listOf("HOME","LUA","PAK","ASSET","FORENSIC","BATCH").forEach { tab ->
                     TextButton(onClick = { section = tab }) {
                         Text(tab, color = if (section == tab) STCyan else STMuted, fontWeight = FontWeight.Bold, fontSize = 9.sp)
                     }
@@ -106,6 +106,9 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                     FeatureCard("PAK ENGINE", "UE4 PAK detection • ZIP-compatible extraction • non-destructive output")
                     FeatureCard("LUA SMART PIPELINE", "Source • Lua bytecode • gzip/zlib candidates • XOR probe • diagnostics")
                     FeatureCard("BATCH ENGINE", "Audit/hash/report architecture untuk batch processing")
+                    FeatureCard("ASSET ENGINE", "UAsset • UExp • UBULK • LOCRES • UMAP classification and batch audit")
+                    FeatureCard("FORENSIC LAB", "Strings • entropy • hex preview • signatures • SHA-256 • evidence report")
+                    FeatureCard("SMART CORE", "Automatic routing, diagnostics, safe output and explicit fallback states")
                     FeatureCard("AUDIT", "SHA-256 • operation report • zip-slip protection • explicit unsupported states")
                 }
                 "LUA" -> {
@@ -147,6 +150,47 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                             } catch (e: Exception) { log = "PAK ERROR • ${e.message ?: "unknown"}" }
                             busy = false
                         }
+                    }
+                }
+                "ASSET" -> {
+                    ToolActionCard("UE4 ASSET ANALYZER", "UAsset • UExp • UBULK • LOCRES • UMAP: klasifikasi, hash, entropy dan laporan.") {
+                        if (uri == null) onPick() else scope.launch {
+                            busy = true
+                            try {
+                                val r = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context, uri) }
+                                report = r
+                                log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, "file_report").toString(2) }
+                            } catch (e: Exception) { log = "ASSET ERROR • ${e.message ?: "unknown"}" }
+                            busy = false
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Surface(color = Color(0xFF0B1020), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        LazyColumn(Modifier.padding(12.dp)) { item { Text(log, color = Color(0xFFD8D8E8), fontSize = 10.sp) } }
+                    }
+                }
+                "FORENSIC" -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            "FILE REPORT" to "file_report",
+                            "STRINGS" to "strings",
+                            "ENTROPY" to "entropy",
+                            "HEX PREVIEW" to "hex"
+                        ).forEach { (title, op) ->
+                            ToolActionCard(title, "ALVSIA forensic engine • non-destructive • output JSON.") {
+                                if (uri == null) onPick() else scope.launch {
+                                    busy = true
+                                    try {
+                                        log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, op).toString(2) }
+                                    } catch (e: Exception) { log = "FORENSIC ERROR • ${e.message ?: "unknown"}" }
+                                    busy = false
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Surface(color = Color(0xFF0B1020), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        LazyColumn(Modifier.padding(12.dp)) { item { Text(log, color = Color(0xFFD8D8E8), fontSize = 10.sp) } }
                     }
                 }
                 else -> {
