@@ -193,13 +193,27 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                         LazyColumn(Modifier.padding(12.dp)) { item { Text(log, color = Color(0xFFD8D8E8), fontSize = 10.sp) } }
                     }
                 }
-                "APK / DEX", "NATIVE", "CRYPTO / RECOVERY", "BATCH / DEV LAB" -> {
-                    ToolActionCard("$section", "Smart Engine workspace • analisis, recovery, audit dan developer pipeline.") {
-                        if (uri == null) onPick() else scope.launch {
-                            busy = true
-                            report = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context, uri) }
-                            log = report?.let { SmartToolEngine.batchClassify(context, uri) } ?: "Tidak ada laporan"
-                            busy = false
+                else -> {
+                    val menu = when (section) {
+                        "APK / DEX" -> listOf("APK ANALYSIS" to "analyze", "DEX / BYTECODE" to "file_report", "APK STRINGS / URL" to "strings", "PACKAGE / SIGNATURE AUDIT" to "file_report")
+                        "NATIVE" -> listOf("ELF / SO ANALYZER" to "file_report", "NATIVE STRINGS / SYMBOLS" to "strings", "DEPENDENCY / ABI AUDIT" to "file_report")
+                        "CRYPTO / RECOVERY" -> listOf("SM4 / ZUC / AES ANALYSIS" to "forensics", "XOR / MULTI-XOR RECOVERY" to "forensics", "KEY / IV CANDIDATE SCAN" to "forensics", "COMPRESSION / LAYER RECOVERY" to "forensics")
+                        else -> listOf("BATCH AUDIT / CLASSIFY" to "batch_audit", "COMPARE / REGRESSION" to "batch_audit", "SELF TEST / ENGINE HEALTH" to "self_test")
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(section, color = STCyan, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
+                        menu.forEach { item ->
+                            ToolActionCard(item.first, "ALVSIA Smart Engine • non-destructive routing • explicit result.") {
+                                if (uri == null) onPick() else scope.launch {
+                                    busy = true
+                                    try {
+                                        log = withContext(Dispatchers.IO) { SmartToolEngine.runOperation(context, uri, item.second).toString(2) }
+                                    } catch (e: Exception) {
+                                        log = item.first + " ERROR • " + (e.message ?: "engine unavailable")
+                                    }
+                                    busy = false
+                                }
+                            }
                         }
                     }
                     Spacer(Modifier.height(10.dp))
