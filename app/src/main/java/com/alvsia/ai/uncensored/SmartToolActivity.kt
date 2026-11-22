@@ -76,7 +76,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
         TopAppBar(
             title = { Column {
                 Text("SMART ALVSIA TOOL", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
-                Text("SMART CORE • PAK • LUA • ASSET • FORENSICS", color = STMuted, fontSize = 8.sp, letterSpacing = 1.2.sp)
+                Text("9 ENGINES • 33 SMART TOOLS", color = STMuted, fontSize = 8.sp, letterSpacing = 1.2.sp)
             }},
             navigationIcon = { TextButton(onClick = { (context as? ComponentActivity)?.finish() }) { Text("BACK", color = STCyan, fontSize = 9.sp) } },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = STInk)
@@ -84,7 +84,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
     }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).background(Brush.verticalGradient(listOf(Color(0xFF0B0D1C), STInk))).padding(14.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf("HOME","LUA","PAK","ASSET","FORENSIC","BATCH").forEach { tab ->
+                listOf("HOME","LUA","PAK / OBB","ASSET / UE","APK / DEX","NATIVE","CRYPTO / RECOVERY","FORENSIC / STRING","BATCH / DEV LAB").forEach { tab ->
                     TextButton(onClick = { section = tab }) {
                         Text(tab, color = if (section == tab) STCyan else STMuted, fontWeight = FontWeight.Bold, fontSize = 9.sp)
                     }
@@ -131,7 +131,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                     }
                     lua?.let { LuaCard(it) }
                 }
-                "PAK" -> {
+                "PAK / OBB", "PAK" -> {
                     ToolActionCard("PAK ANALYZE / EXTRACT", "UE4 PAK dikenali; ZIP-compatible fixture dapat diekstrak aman.") {
                         if (uri == null) onPick() else scope.launch {
                             busy = true
@@ -152,7 +152,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                         }
                     }
                 }
-                "ASSET" -> {
+                "ASSET / UE", "ASSET" -> {
                     ToolActionCard("UE4 ASSET ANALYZER", "UAsset • UExp • UBULK • LOCRES • UMAP: klasifikasi, hash, entropy dan laporan.") {
                         if (uri == null) onPick() else scope.launch {
                             busy = true
@@ -169,7 +169,7 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                         LazyColumn(Modifier.padding(12.dp)) { item { Text(log, color = Color(0xFFD8D8E8), fontSize = 10.sp) } }
                     }
                 }
-                "FORENSIC" -> {
+                "FORENSIC / STRING", "FORENSIC" -> {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(
                             "FILE REPORT" to "file_report",
@@ -193,8 +193,8 @@ private fun SmartToolScreen(uri: Uri?, onPick: () -> Unit, onClear: () -> Unit) 
                         LazyColumn(Modifier.padding(12.dp)) { item { Text(log, color = Color(0xFFD8D8E8), fontSize = 10.sp) } }
                     }
                 }
-                else -> {
-                    ToolActionCard("BATCH / AUDIT", "Analisis file, hash, klasifikasi dan laporan.") {
+                "APK / DEX", "NATIVE", "CRYPTO / RECOVERY", "BATCH / DEV LAB" -> {
+                    ToolActionCard("$section", "Smart Engine workspace • analisis, recovery, audit dan developer pipeline.") {
                         if (uri == null) onPick() else scope.launch {
                             busy = true
                             report = withContext(Dispatchers.IO) { SmartToolEngine.analyze(context, uri) }
