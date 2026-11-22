@@ -9998,3 +9998,588 @@ def show_trial_menu():
                 console.print("[red]❌ Invalid number![/red]")
                 continue
             keys = generate_bulk_trials(trial_type, count)
+            console.print(f"\n[bold green]✅ Generated {len(keys)} keys:[/bold green]")
+            for k in keys:
+                console.print(f"  [bold yellow]{k}[/bold yellow]")
+            safe_input("\nPress Enter...")
+        elif choice == "5":
+            list_all_trials()
+            safe_input("\nPress Enter...")
+        elif choice == "6":
+            key = safe_input("[bold cyan]Enter trial key: [/bold cyan]").strip()
+            if key in TRIAL_DATABASE:
+                display_trial_key_info(key)
+                status, info = check_trial_key_status(key)
+                console.print(f"\n[bold cyan]Details:[/bold cyan]\n{info}")
+            else:
+                console.print("[red]❌ Key not found![/red]")
+            safe_input("\nPress Enter...")
+        elif choice == "7":
+            key = safe_input("[bold cyan]Enter trial key to delete: [/bold cyan]").strip()
+            delete_trial_key_author(key)
+            safe_input("\nPress Enter...")
+        else:
+            console.print("[red]❌ Invalid![/red]")
+
+# ==================== LICENSE CHECK ====================
+
+def check_license():
+    current_device_id = get_device_id()
+    saved_license = load_license_data()
+    if saved_license is not None:
+        saved_key = saved_license.get("license_key", "")
+        saved_device = saved_license.get("device_id", "")
+        saved_hash = saved_license.get("license_hash", "")
+        expected_hash = generate_license_hash(saved_key, saved_device)
+        if saved_hash == expected_hash and saved_device == current_device_id:
+            if saved_key in TRIAL_DATABASE:
+                status, info = check_trial_key_status(saved_key)
+                if status != "ACTIVE":
+                    console.print(f"\n[bold red]❌ Trial key {status}![/bold red]")
+                    if LICENSE_FILE.exists():
+                        LICENSE_FILE.unlink()
+                    return check_license()
+                else:
+                    data = TRIAL_DATABASE[saved_key]
+                    console.print(f"\n[bold green]╔{'═' * 56}╗[/bold green]")
+                    console.print(f"[bold green]║  [bold green]🎫 TRIAL LICENSE ACTIVE![bold green]                      [bold green]║[/bold green]")
+                    console.print(f"[bold green]║  [bold cyan]Key: [bold white]{saved_key[:20]}...[bold green]                      [bold green]║[/bold green]")
+                    console.print(f"[bold green]║  [bold cyan]Type: [bold yellow]{data['label']}[/bold green]")
+                    console.print(f"[bold green]║  [bold cyan]Device: [bold white]{current_device_id}[bold green]                   [bold green]║[/bold green]")
+                    console.print(f"[bold green]║  [bold cyan]Expires: [bold yellow]{data['expires']}[/bold green]")
+                    console.print(f"[bold green]║  [bold cyan]Status: [bold green]✅ ACTIVE[/bold green]                              [bold green]║[/bold green]")
+                    console.print(f"[bold green]╚{'═' * 56}╝[/bold green]")
+                    return True
+            if saved_key in LICENSE_DATABASE:
+                if is_key_expired(saved_key):
+                    console.print(f"\n[bold red]❌ License has EXPIRED![/bold red]")
+                    if LICENSE_FILE.exists():
+                        LICENSE_FILE.unlink()
+                    return check_license()
+                else:
+                    activation_date = saved_license.get("activation_date", "N/A")
+                    remaining = get_remaining_days(saved_key)
+                    key_type = LICENSE_DATABASE[saved_key]["type"]
+                    label = LICENSE_TYPES[key_type]["label"]
+                    console.print(f"\n[bold green]╔{'═' * 56}╗[/bold green]")
+                    console.print(f"[bold green]║  [bold green]🔑 PREMIUM LICENSE ACTIVE![bold green]                  [bold green]║[/bold green]")
+                    console.print(f"[bold green]║  [bold cyan]Key: [bold white]{saved_key[:20]}...[bold green]                      [bold green]║[/bold green]")
+                    console.print(f"[bold green]║  [bold cyan]Type: [bold yellow]{label}[/bold green]                             [bold green]║[/bold green]")
+                    console.print(f"[bold green]║  [bold cyan]Device: [bold white]{current_device_id}[bold green]                   [bold green]║[/bold green]")
+                    console.print(f"[bold green]║  [bold cyan]Activated: [bold white]{activation_date}[bold green]            [bold green]║[/bold green]")
+                    if remaining > 999:
+                        console.print(f"[bold green]║  [bold cyan]Status: [bold green]✅ LIFETIME[/bold green]                           [bold green]║[/bold green]")
+                    else:
+                        console.print(f"[bold green]║  [bold cyan]Status: [bold green]✅ ACTIVE ({remaining} days)[bold green]            [bold green]║[/bold green]")
+                    console.print(f"[bold green]╚{'═' * 56}╝[/bold green]")
+                    return True
+            if saved_key in VALID_LICENSE_KEYS:
+                activation_date = saved_license.get("activation_date", "N/A")
+                console.print(f"\n[bold green]╔{'═' * 56}╗[/bold green]")
+                console.print(f"[bold green]║  [bold green]🔑 LEGACY LICENSE ACTIVE![bold green]                    [bold green]║[/bold green]")
+                console.print(f"[bold green]║  [bold cyan]Key: [bold white]{saved_key[:20]}...[bold green]                      [bold green]║[/bold green]")
+                console.print(f"[bold green]║  [bold cyan]Device: [bold white]{current_device_id}[bold green]                   [bold green]║[/bold green]")
+                console.print(f"[bold green]║  [bold cyan]Activated: [bold white]{activation_date}[bold green]            [bold green]║[/bold green]")
+                console.print(f"[bold green]║  [bold cyan]Status: [bold green]✅ ACTIVE[/bold green]                              [bold green]║[/bold green]")
+                console.print(f"[bold green]╚{'═' * 56}╝[/bold green]")
+                return True
+        console.print(f"[bold red]⚠ License verification failed! Re-enter key.[/bold red]")
+        if LICENSE_FILE.exists():
+            LICENSE_FILE.unlink()
+    console.print(f"\n[bold magenta]╔{'═' * 56}╗[/bold magenta]")
+    console.print(f"[bold magenta]║  [bold yellow]🔑 LICENSE ACTIVATION REQUIRED[bold magenta]                      [bold magenta]║[/bold magenta]")
+    console.print(f"[bold magenta]║  [bold white]Enter your premium license key to continue[bold magenta]          [bold magenta]║[/bold magenta]")
+    console.print(f"[bold magenta]║  [bold cyan]Contact @GODXKAZUKII to get license key[bold magenta]              [bold magenta]║[/bold magenta]")
+    console.print(f"[bold magenta]║  [dim]Your Device ID: {current_device_id}[bold magenta]                  [bold magenta]║[/bold magenta]")
+    console.print(f"[bold magenta]╚{'═' * 56}╝[/bold magenta]")
+    attempts = 3
+    while attempts > 0:
+        print()
+        license_key = safe_input(f"[bold yellow]⚡ Enter License Key ({attempts} attempts left): [/bold yellow]").strip()
+        if not license_key:
+            console.print(f"[bold red]❌ Key cannot be empty![/bold red]")
+            attempts -= 1
+            continue
+        if license_key in TRIAL_DATABASE:
+            success, msg = activate_trial_key(license_key)
+            if success:
+                console.print(f"\n[bold green]🎉 TRIAL ACTIVATED![/bold green]")
+                console.print(f"[bold green]{msg}[/bold green]")
+                return True
+            else:
+                console.print(f"[bold red]❌ {msg}[/bold red]")
+                attempts -= 1
+                continue
+        if license_key in LICENSE_DATABASE:
+            if is_key_expired(license_key):
+                console.print(f"[bold red]❌ License key has EXPIRED![/bold red]")
+                attempts -= 1
+                continue
+            save_license_data(license_key, current_device_id)
+            key_type = LICENSE_DATABASE[license_key]["type"]
+            label = LICENSE_TYPES[key_type]["label"]
+            remaining = get_remaining_days(license_key)
+            console.print(f"\n[bold green]╔{'═' * 56}╗[/bold green]")
+            console.print(f"[bold green]║  [bold green on white] 🎉 LICENSE ACTIVATED SUCCESSFULLY! [/bold green on white]             [bold green]║[/bold green]")
+            console.print(f"[bold green]║  [bold cyan]Key: [bold white]{license_key}[/bold green]")
+            console.print(f"[bold green]║  [bold cyan]Type: [bold yellow]{label}[/bold green]")
+            console.print(f"[bold green]║  [bold cyan]Device: [bold white]{current_device_id}[/bold green]                   [bold green]║[/bold green]")
+            console.print(f"[bold green]║  [bold cyan]Model: [bold white]{get_device_model()}[/bold green]                              [bold green]║[/bold green]")
+            console.print(f"[bold green]║  [bold cyan]Activated: [bold white]{datetime.now().strftime('%d-%m-%Y %H:%M:%S')}[/bold green]       [bold green]║[/bold green]")
+            if remaining > 999:
+                console.print(f"[bold green]║  [bold cyan]Status: [bold green]✅ LIFETIME ACTIVE[/bold green]                     [bold green]║[/bold green]")
+            else:
+                console.print(f"[bold green]║  [bold cyan]Status: [bold green]✅ ACTIVE ({remaining} days)[/bold green]              [bold green]║[/bold green]")
+            console.print(f"[bold green]║  [bold yellow]Thank you for choosing @GODXKAZUKII![/bold green]                 [bold green]║[/bold green]")
+            console.print(f"[bold green]╚{'═' * 56}╝[/bold green]")
+            return True
+        if license_key in VALID_LICENSE_KEYS:
+            save_license_data(license_key, current_device_id)
+            console.print(f"\n[bold green]✅ LEGACY KEY ACTIVATED![/bold green]")
+            return True
+        attempts -= 1
+        if attempts > 0:
+            console.print(f"[bold red]╔{'═' * 56}╗[/bold red]")
+            console.print(f"[bold red]║  [bold red]❌ INVALID LICENSE KEY![/bold red]                              [bold red]║[/bold red]")
+            console.print(f"[bold red]║  [bold yellow]Attempts remaining: {attempts}[/bold red]                          [bold red]║[/bold red]")
+            console.print(f"[bold red]║  [bold cyan]Contact @GODXKAZUKII for valid key[/bold red]                   [bold red]║[/bold red]")
+            console.print(f"[bold red]╚{'═' * 56}╝[/bold red]")
+        else:
+            console.print(f"\n[bold red]╔{'═' * 56}╗[/bold red]")
+            console.print(f"[bold red]║  [bold white on red] 🚫 ALL ATTEMPTS USED! ACCESS DENIED! [/bold white on red]          [bold red]║[/bold red]")
+            console.print(f"[bold red]║  [bold yellow]Contact @GODXKAZUKII for license key[/bold red]                 [bold red]║[/bold red]")
+            console.print(f"[bold red]║  [bold cyan]Device ID: [bold white]{current_device_id}[/bold red]                  [bold red]║[/bold red]")
+            console.print(f"[bold red]╚{'═' * 56}╝[/bold red]")
+            return False
+    return False
+
+# ==================== LICENSE INFO DISPLAY ====================
+
+def show_license_info():
+    device_id = get_device_id()
+    license_data = load_license_data()
+    now = datetime.now()
+    remaining_days = (TOOL_EXPIRY_DATE - now).days
+    console.print(f"\n[bold cyan]╔{'═' * 56}╗[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold yellow]📋 LICENSE & DEVICE INFORMATION[/bold cyan]                     [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]╠{'═' * 56}╣[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold magenta]🆔 DEVICE INFO[/bold cyan]                                      [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold white]Device ID: [bold green]{device_id}[/bold cyan]                    [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold white]Model:     [bold green]{get_device_model()}[/bold cyan]                            [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold white]Android:   [bold green]{get_android_version()}[/bold cyan]                               [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]╠{'─' * 56}╣[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold magenta]🔑 LICENSE INFO[/bold cyan]                                     [bold cyan]║[/bold cyan]")
+    if license_data:
+        key = license_data.get("license_key", "N/A")
+        act_date = license_data.get("activation_date", "N/A")
+        if key in TRIAL_DATABASE:
+            data = TRIAL_DATABASE[key]
+            remaining = (datetime.strptime(data["expires"], "%Y-%m-%d %H:%M:%S") - now).total_seconds() / 3600
+            console.print(f"[bold cyan]║  [bold white]Key:       [bold green]{key}[/bold green]")
+            console.print(f"[bold cyan]║  [bold white]Type:      [bold yellow]TRIAL ({data['label']})[/bold yellow]")
+            console.print(f"[bold cyan]║  [bold white]Expires:   [bold magenta]{data['expires']}[/bold magenta]")
+            console.print(f"[bold cyan]║  [bold white]Remaining: [bold cyan]{remaining:.1f} hours[/bold cyan]")
+            console.print(f"[bold cyan]║  [bold white]Status:    [bold green]✅ ACTIVE[/bold cyan]                              [bold cyan]║[/bold cyan]")
+        else:
+            console.print(f"[bold cyan]║  [bold white]Key:       [bold green]{key}[/bold green]")
+            console.print(f"[bold cyan]║  [bold white]Activated: [bold green]{act_date}[/bold green]")
+            console.print(f"[bold cyan]║  [bold white]Status:    [bold green]✅ ACTIVE[/bold cyan]                              [bold cyan]║[/bold cyan]")
+    else:
+        console.print(f"[bold cyan]║  [bold white]Status:    [bold red]❌ NOT ACTIVATED[/bold cyan]                        [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]╠{'─' * 56}╣[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold magenta]⏰ EXPIRY INFO[/bold cyan]                                      [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold white]Expiry:    [bold yellow]{TOOL_EXPIRY_DATE.strftime('%d-%m-%Y')}[/bold cyan]                          [bold cyan]║[/bold cyan]")
+    if remaining_days > 30:
+        console.print(f"[bold cyan]║  [bold white]Remaining: [bold green]{remaining_days} days[/bold cyan]                             [bold cyan]║[/bold cyan]")
+    elif remaining_days > 0:
+        console.print(f"[bold cyan]║  [bold white]Remaining: [bold yellow]{remaining_days} days ⚠[/bold cyan]                          [bold cyan]║[/bold cyan]")
+    else:
+        console.print(f"[bold cyan]║  [bold white]Remaining: [bold red]EXPIRED! ❌[/bold cyan]                            [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]╚{'═' * 56}╝[/bold cyan]")
+
+# ==================== RESET LICENSE ====================
+
+def reset_license():
+    admin_password = "GODXKAZUKII_2027"
+    console.print(f"\n[bold red]╔{'═' * 56}╗[/bold red]")
+    console.print(f"[bold red]║  [bold white on red] 🔐 ADMIN LICENSE RESET [/bold white on red]                      [bold red]║[/bold red]")
+    console.print(f"[bold red]║  [bold yellow]⚠ This will reset ALL license data![/bold red]    [bold red]║[/bold red]")
+    console.print(f"[bold red]║  [bold yellow]⚠ Device lock will be removed![/bold red]        [bold red]║[/bold red]")
+    console.print(f"[bold red]║  [bold yellow]⚠ Re-activation will be required![/bold red]      [bold red]║[/bold red]")
+    console.print(f"[bold red]╚{'═' * 56}╝[/bold red]")
+    password = safe_input(f"[bold red]🔐 Enter Admin Password: [/bold red]").strip()
+    if password != admin_password:
+        console.print(f"[bold red]❌ Wrong admin password![/bold red]")
+        return False
+    console.print(f"[bold cyan]🔄 Resetting license data...[/bold cyan]")
+    if LICENSE_FILE.exists():
+        LICENSE_FILE.unlink()
+        console.print(f"[bold green]✅ License file deleted![/bold green]")
+    if DEVICE_FILE.exists():
+        DEVICE_FILE.unlink()
+        console.print(f"[bold green]✅ Device lock file deleted![/bold green]")
+    console.print(f"\n[bold green]✅ License Reset Complete![/bold green]")
+    console.print(f"[bold yellow]Restart the tool to re-activate.[/bold yellow]")
+    return True
+
+# ==================== MASTER SECURITY CHECK ====================
+
+def run_security_check():
+    """PATCHED: bypass all checks, always returns True."""
+    return True
+
+# ======================================================================
+# 🔥 MODIFIED MAIN FUNCTION TO INCLUDE SECURITY AND NEW MENU OPTIONS
+# ======================================================================
+
+def show_main_menu():
+    txt = TRANSLATIONS[CURRENT_LANGUAGE]
+    
+    menu_table = Table(
+        show_header=True,
+        header_style=f"bold black on {get_banner_color()}",
+        box=box.ROUNDED,
+        border_style=get_banner_color(),
+        expand=True,
+        padding=(0, 1)
+    )
+    
+    if CURRENT_SESSION_COLOR == "rainbow":
+        menu_table.add_column(rainbow_text("𝐎𝐏𝐓"), justify="center", width=5)
+        menu_table.add_column(rainbow_text("𝐂𝐎𝐌𝐌𝐀𝐍𝐃"), width=24)
+        menu_table.add_column(rainbow_text("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍"), ratio=1)
+    else:
+        menu_table.add_column("𝐎𝐏𝐓", style="bold cyan", justify="center", width=5)
+        menu_table.add_column("𝐂𝐎𝐌𝐌𝐀𝐍𝐃", style=f"bold {get_banner_color()}", width=24)
+        menu_table.add_column("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍", style="white", ratio=1)
+    
+    menu_items = [
+        ("1", txt["OPT_UNPACK"], txt["DESC_UNPACK"]),
+        ("2", txt["OPT_REPACK"], txt["DESC_REPACK"]),
+        ("3", txt["OPT_CLEAR"], txt["DESC_CLEAR"]),
+        ("4", txt["OPT_SINGLE"], txt["DESC_SINGLE"]),
+        ("5", txt["OPT_ENCRYPT"], txt["DESC_ENCRYPT"]),
+        ("6", txt["OPT_ANALYZE"], txt["DESC_ANALYZE"]),
+        ("7", txt["OPT_CREDIT"], txt["DESC_CREDIT"]),
+        ("8", to_fancy("𝐋𝐔𝐀 𝐌𝐎𝐃𝐃𝐈𝐍𝐆 𝐓𝐎𝐎𝐋"), to_fancy("Decompile & Repack Lua")),
+        ("9", txt["OPT_COMBINED"], txt["DESC_COMBINED"]),
+        ("10", to_fancy("𝐀𝐍𝐓𝐈𝐑𝐄𝐒𝐄𝐓 𝐎𝐁𝐁 𝐓𝐎𝐎𝐋"), to_fancy("Unpack/Repack/Rezip OBB")),
+        # NEW SECURITY OPTIONS (11,12,13)
+        ("11", to_fancy("🔑 LICENSE INFO"), to_fancy("Show license & device info")),
+        ("12", to_fancy("🔄 RESET LICENSE"), to_fancy("Reset license & device lock (Admin)")),
+        ("13", to_fancy("🔐 AUTHOR LICENSE"), to_fancy("Generate/Manage keys (Author only)")),
+        ("14", to_fancy("🎨 BANNER & COLOR CHANGE"), to_fancy("Change tool banner name & color")),
+        ("15", to_fancy("🔒 PAK ENCRYPT TOOL"), to_fancy("Normal / Custom Enc / Decrypt Restore")),
+        ("0", txt['OPT_EXIT'], txt["DESC_EXIT"])
+    ]
+    
+    for i, (opt, cmd, desc) in enumerate(menu_items):
+        if CURRENT_SESSION_COLOR == "rainbow":
+            # True smooth rainbow across every visible character in the main menu.
+            menu_table.add_row(
+                rainbow_text(opt, 0),
+                rainbow_text(str(cmd), 0),
+                rainbow_text(str(desc), 0),
+            )
+        elif opt == "0":
+            menu_table.add_row(f"[bold red]{opt}[/bold red]", f"[bold red]{cmd}[/bold red]", f"[dim red]{desc}[/dim red]")
+        else:
+            menu_table.add_row(f"[bold cyan]{opt}[/bold cyan]", f"[bold {get_banner_color()}]{cmd}[/bold {get_banner_color()}]", f"[white]{desc}[/white]")
+            
+    console.print()
+    console.print(Panel(
+        menu_table,
+        title= f"[reverse bold {get_banner_color()}] ⚡ 𝐏𝐑𝐄𝐌𝐈𝐔𝐌 𝐂𝐎𝐑𝐄 ⚡ [/]",
+        border_style=get_banner_color(),
+        box=box.HEAVY,
+        padding=(0, 0)
+    ))
+    
+def auto_termux_setup():
+    import os, time
+    
+    if "com.termux" not in os.environ.get("PREFIX", ""):
+        return
+
+    needs_setup = False
+    try:
+        import pyfiglet, rich, requests, gmalg, Crypto, zstandard
+        if not os.path.exists(os.path.expanduser("~/storage")):
+            needs_setup = True
+    except ImportError:
+        needs_setup = True
+
+    if not needs_setup:
+        return
+
+    Y = "\033[1;33m"  
+    G = "\033[1;32m"  
+    C = "\033[1;36m"
+    RES = "\033[0m"   
+
+    os.system("clear")
+    print(f"{C}██████████████████████████████████████████████████{RES}")
+    print(f"{G}    🚀 KAZUKI SYSTEM AUTO-INSTALLER 🚀{RES}")
+    print(f"{C}██████████████████████████████████████████████████{RES}\n")
+    print(f"{Y}[*] First time setup detected! Automating installation...{RES}\n")
+    time.sleep(1)
+
+    print(f"{C}--------------------------------------------------{RES}")
+    print(f"{G}[>] Granting Storage Permissions (Auto){RES}")
+    if not os.path.exists(os.path.expanduser("~/storage")):
+        print(f"{Y}[$] termux-setup-storage{RES}")
+        os.system("yes | termux-setup-storage")
+        print(f"{Y}[!] Please click 'ALLOW' on the popup if it appears.{RES}")
+        time.sleep(2)
+    else:
+        print(f"{Y}[+] Storage already linked. Skipping...{RES}")
+
+    print(f"{C}--------------------------------------------------{RES}")
+    print(f"{G}[>] Updating Server Repositories{RES}")
+    print(f"{Y}[$] pkg update -y && pkg upgrade -y{RES}")
+    os.system("pkg update -y && pkg upgrade -y")
+
+    print(f"{C}--------------------------------------------------{RES}")
+    print(f"{G}[>] Installing Core Packages (Python, Clang, Make){RES}")
+    print(f"{Y}[$] pkg install python python-pip clang make -y{RES}")
+    os.system("pkg install python python-pip clang make -y")
+
+    print(f"{C}--------------------------------------------------{RES}")
+    print(f"{G}[>] Installing VIP Python Libraries{RES}")
+    print(f"{Y}[$] pip install pyfiglet rich pycryptodome zstandard{RES}")
+    os.system("pip install pyfiglet rich pycryptodome zstandard")
+
+    print(f"{C}--------------------------------------------------{RES}")
+    print(f"{G}[>] Setting System Permissions{RES}")
+    print(f"{Y}[$] chmod +x *{RES}")
+    os.system("chmod +x *")
+
+    print(f"\n{C}██████████████████████████████████████████████████{RES}")
+    print(f"{G} ✅ ALL SYSTEMS GO! INITIALIZATION COMPLETE. ✅{RES}")
+    print(f"{C}██████████████████████████████████████████████████{RES}\n")
+    time.sleep(2)
+    os.system("clear")
+
+def main():   
+    # Setup sabse pehle run hoga
+    auto_termux_setup()
+    
+    # ====== RUN SECURITY CHECK FIRST ======
+    if not run_security_check():
+        console.print(f"\n[bold red]❌ Security check failed! Access denied.[/bold red]")
+        time.sleep(3)
+        return
+    
+    kill_hacker()
+    BASE = Path('𝐊𝐀𝐙𝐔𝐊𝐈_𝐓𝐎𝐎𝐋')
+    create_dirs(BASE)
+    
+    auth_status = check_password_login()
+    
+    global SESSION_KEY, SM4_SECRET_NEW, ENGINE_LOCKED, SERVER_LUA_XOR_KEY_HEX
+    
+    # Offline startup: no server token / heartbeat / deliberate crash dependency.
+    if not SM4_SECRET_NEW:
+        console.print("[yellow]ℹ Offline mode: server-only SM4_NEW keys are not embedded in the source.[/yellow]")
+    
+    obb_unpacker = BASE / "OBB_UNPACKER"
+    ORGNAL_PATH = obb_unpacker / ORGNAL_DIR
+    MODIFIED_PATH = obb_unpacker / EDITED_DIR
+    UNPACK_PATH = obb_unpacker / UNPACK_DIR
+    REPACK_PATH = obb_unpacker / REPACK_DIR
+    SINGLE_PATH = obb_unpacker / SINGLE_DIR
+
+    # 🔥 VALID OPTIONS LIST (extended with 11,12,13,14)
+    VALID_OPTIONS = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}
+
+    while True:
+        TRANSLATIONS[CURRENT_LANGUAGE]["BANNER_TITLE"] = to_fancy(get_main_banner().split('\n')[-2].strip().replace('𓂃', '').replace('[blink]', '').replace('[/blink]', '') if '𓂃' in get_main_banner() else "SYSTEM CORE")
+        
+        print_banner_and_header()
+        print_user_profile()
+        show_main_menu()
+        
+        b_color = get_banner_color()
+        prompt_text = to_fancy(TRANSLATIONS[CURRENT_LANGUAGE]["PROMPT_CHOICE"])
+        choice = Prompt.ask(f"[bold {b_color}]{prompt_text}[/bold {b_color}]")
+        
+        # 🔥 INVALID OPTION CHECK - SCREEN CLEAR NAHI HOGI
+        if choice not in VALID_OPTIONS:
+            console.print()
+            console.print(Panel(
+                f"[bold red]❌ INVALID OPTION![/bold red]\n"
+                f"[yellow]Please enter a valid option (0-15)[/yellow]",
+                title="[bold white on red] ⚠️ ERROR ⚠️ [/]",
+                border_style="red",
+                box=box.HEAVY
+            ))
+            console.print()
+            time.sleep(1.5)
+            continue  # 🔥 SCREEN CLEAR NAHI HOGA, SIRF ERROR DIKHEGA
+        
+        if choice == "0":
+            goodbye_glacier_light_effect()
+            return
+        
+        # ====== HANDLE NEW SECURITY OPTIONS ======
+        if choice == "11":
+            show_license_info()
+            Prompt.ask("\nPress Enter to continue", default="")
+            continue
+        if choice == "12":
+            reset_license()
+            Prompt.ask("\nPress Enter to continue", default="")
+            continue
+        if choice == "13":
+            show_author_license_menu()
+            Prompt.ask("\nPress Enter to continue", default="")
+            continue
+        if choice == "14":
+            change_big_banner()
+            Prompt.ask("\nPress Enter to continue", default="")
+            continue
+        if choice == "15":
+            run_pak_encrypt_submenu()
+            continue
+        
+        # ====== ORIGINAL HANDLERS (unchanged) ======
+        if choice == "1": 
+            unpack_all_files()
+            continue
+        
+        if choice == "3":
+            if Confirm.ask("[bold red]Are you sure you want to delete ALL unpacked files?[/]"):
+                clear_all_unpack_data()
+            continue
+        
+        if choice == "4": 
+            pak_files = list_paks_in_folder(ORGNAL_PATH)
+            if not pak_files:
+                console.print(Panel(f"[red]No .pak/.obb files found in {ORGNAL_PATH.resolve()}[/red]", title="❗ No PAKs", style="red"))
+                Prompt.ask("\nPress Enter to continue", default="")
+                continue
+            console.clear()
+            print_banner_and_header()
+            console.print(Panel("[bold cyan]⚡ KAZUKI DEEP HUNTER (CLEAN UI) ⚡[/bold cyan]\n\n[dim white]Paste ke baad [/dim white][bold cyan]DOUBLE ENTER[/bold cyan][dim white] dabao![/dim white]", border_style="bright_blue", box=box.DOUBLE_EDGE))
+            
+            targets = []
+            print("\033[1;34m👇 Paste File Names (Blue Mode):\033[0m")
+            while True:
+                line = input("\033[1;36m").strip()
+                print("\033[0m", end="", flush=True) 
+                if not line: break
+                targets.extend([x.strip() for x in line.split(',') if x.strip()])
+            targets = list(set(targets))
+            if not targets: continue
+
+            console.clear()
+            print_banner_and_header()
+            total_extracted = 0
+            
+            with Progress(SpinnerColumn("dots", style="bold cyan"), TextColumn("[progress.description]{task.description}"), console=console) as progress:
+                task = progress.add_task("[bold bright_blue]Deep Hunting in Progress...", total=len(pak_files))
+                for pak_path in pak_files:
+                    try:
+                        pak = TencentPakFile(pak_path, silent=True) 
+                        for target in targets:
+                            for dir_path, dir_content in pak._index.items():
+                                if target in dir_content:
+                                    entry_found = dir_content[target]
+                                    relative_dir = dir_path.relative_to(pak._mount_point) if dir_path.parts and dir_path.parts[0] == pak._mount_point.name else dir_path
+                                    pak_stem = Path(pak._file_path).stem
+                                    out_dir = SINGLE_PATH.parent / SINGLE_PATH.name / pak_stem / relative_dir
+                                    os.makedirs(to_long_path(out_dir), exist_ok=True)
+                                    pak._write_to_disk(out_dir / target, entry_found)
+                                    total_extracted += 1
+                                    progress.console.print(f"[bold green]✔ FOUND & EXTRACTED:[/] [bold bright_blue]{target}[/]")
+                    except Exception: 
+                        pass
+                    progress.advance(task)
+            
+            if total_extracted > 0:
+                console.print(Panel(f"[bold bright_blue]✔ SUCCESS: {total_extracted} instances extracted successfully![/bold bright_blue]\n[bold bright_blue]Saved to: {SINGLE_PATH.name}/[/bold bright_blue]", title="[bold green]✔ AUTO MULTI-UNPACK COMPLETE![/bold green]", border_style="green", box=box.HEAVY))
+            Prompt.ask("\n[bold bright_blue]Press Enter to return to menu[/bold bright_blue]", default="")
+            continue
+
+        if choice == "5": 
+            run_encrypt_tool()
+            continue
+        if choice == "6": 
+            run_obb_analysis_tool()
+            continue
+        if choice == "7": 
+            black_tool_main()
+            continue
+        if choice == "8": 
+            run_lua_tool()
+            continue
+        if choice == "9": 
+            run_combined_modding_tool()
+            continue
+        if choice == "10": 
+            run_obbzip_tool()
+            continue
+        
+        TencentPakFile.INPUT_DIR = ORGNAL_PATH
+        TencentPakFile.OUTPUT_BASE = UNPACK_PATH
+        TencentPakFile.MODIFIED_DIR = MODIFIED_PATH
+
+        pak_files = list_paks_in_folder(ORGNAL_PATH)
+        if not pak_files:
+            console.print(Panel(f"[red]No .pak/.obb files found in {ORGNAL_PATH.resolve()}[/red]", title="❗ No PAKs", style="red"))
+            Prompt.ask("\nPress Enter to continue", default="")
+            continue
+
+        selected = []
+        if choice == "2":
+            selected = auto_detect_repack_candidates(pak_files, MODIFIED_PATH)
+            if not selected:
+                console.print(Panel("[yellow]No matching PAKs found for the files in Modified_files.[/yellow]"))
+                Prompt.ask("\nPress Enter to continue", default="")
+                continue
+            
+            target_list = []
+            for i, p in enumerate(selected):
+                target_list.append(f"  [bold cyan]{i+1}.[/] [bold {get_banner_color()}]{to_fancy(p.name)}[/] [dim]-> Found modified files.[/dim]")
+            
+            console.print(Panel(
+                "\n".join(target_list), 
+                title= f"[bold black on {get_banner_color()}]  SMART REPACK [/]", 
+                border_style=get_banner_color(), 
+                box=box.HEAVY
+            ))
+
+            if Prompt.ask(f"\n[bold yellow]Proceed to Repack these {len(selected)} files?[/bold yellow] (y/n)", default="y").lower() != 'y': 
+                continue
+            
+            import shutil
+            for pak_path in selected:
+                console.print(f"\n[bold cyan]📦 Repacking:[/] {pak_path.name}")
+                try:
+                    repacked_file = REPACK_PATH / pak_path.name
+                    if repacked_file.exists():
+                        repacked_file.unlink()
+                    shutil.copy2(to_long_path(pak_path), to_long_path(repacked_file))
+                    
+                    pak = TencentPakFile(pak_path)
+                    with open_long(repacked_file, 'r+b') as fh:
+                        success = pak.repack_inplace_from_modified_dir(fh)
+                    
+                    if success:
+                        console.print(f"[bold {get_banner_color()}]✔ SUCCESSFULLY REPACKED:[/] [bold green]{str(repacked_file.resolve())}[/bold green]")
+                    else:
+                        console.print(f"[bold yellow]⚠️ Koi file inplace repack nahi ho payi in:[/] {pak_path.name}")
+                except Exception as e:
+                    console.print(f"[bold red]❌ Repack Error for {pak_path.name}: {e}[/bold red]")
+                    
+            Prompt.ask("\n[bold white]Press Enter to return to menu...[/bold white]", default="")
+            continue  # 🔥 FIX: loop back to menu, don't fall through
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        os._exit(0)
+    except Exception as e:
+        print(f"\n[!] BHAUKAAL ERROR: {e}")
+        os._exit(1)
