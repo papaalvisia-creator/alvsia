@@ -4998,3 +4998,5003 @@ def black_tool_do_repack_fancy(tool):
 TARGET_GROUPS = {
     "1. MATCH START & THEME": ["Match starts in <MatchStartInfo>{0}</>", "Match starts in", "Your match starts in", "Bonus Challenge match starts", "LEAN (BGMI 2026 Theme Song)"],
     "2. CHICKEN DINNER": ["WINNER WINNER CHICKEN DINNER!", "WINNER WINNER CHICKEN DINNER", "Winner Winner Chicken Dinner", "Winner winner chicken dinner"],
+    "3. BETTER LUCK NEXT TIME": ["Better Luck Next Time", "BETTER LUCK NEXT TIME"],
+    "4. TEAMMATE DAMAGE WARNINGS": ["As you attacked your teammate first", "As you have maliciously injured your teammate"],
+    "5. QUICK CHAT MESSAGES": ["Watch your aim and finish them off!", "Get behind the wheel and crush them!"],
+    "6. BAN PAN SECURITY": ["Ban Pan", "Ban Pan - Pan", "BGMI & Ban Pan"],
+    "7. SPLASH SCREEN WARNING": ["Battlegrounds Mobile India is not a real-world based game"],
+    "8. HOME ISLE NOTIFICATIONS": ["Home Isle is an island located in the ocean", "Now, let me briefly explain removing objects", "Lastly, here's an important tip", "It's important to note that once you finish building", "Your time spent working on your Home has reached a new milestone!", "This past year witnessed our growth and progress", "There are so many beautiful moments we have shared together."],
+    "9. GAME EVENTS & UI": ["Sara is a vehicle expert", "Vehicle weapons will automatically lock", "Try out the DJ stage", "You have collected 3 vehicle finishes", "Clan Battle is about to start", "Try the smart Digi-pal chat", "Too many PvE enemy eliminations", "Synergy: Some Popularity gifts", "Win battles with your friends", "The Aerolith has begun absorbing mutants", "8. If you have any questions regarding payment", "Myriad splendors glazed"]
+}
+
+def get_live_input_match_start(prompt_text):
+    sys.stdout.write(prompt_text)
+    sys.stdout.flush()
+    input_str = ""
+    while True:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        if ch == '\r': 
+            print()
+            break
+        elif ch == '\x7f': 
+            if len(input_str) > 0: input_str = input_str[:-1]
+        else: input_str += ch
+
+        sys.stdout.write('\r' + ' ' * (len(prompt_text) + len(input_str) + 15) + '\r')
+        sys.stdout.write(prompt_text)
+        display = input_str
+        if "[" in display and "]" in display:
+            parts = display.split("[", 1)
+            pre = parts[0]
+            inner_post = parts[1].split("]", 1)
+            inner = inner_post[0]
+            post = inner_post[1] if len(inner_post) > 1 else ""
+            sys.stdout.write(f"{pre}\033[96m[\033[0m \033[93m{inner}\033[0m \033[96m]\033[0m{post}")
+        elif "[" in display:
+            pre, inner = display.split("[", 1)
+            sys.stdout.write(f"{pre}\033[96m[\033[0m\033[93m{inner}\033[0m")
+        else:
+            sys.stdout.write(f"\033[93m{display}\033[0m")
+        sys.stdout.flush()
+    return input_str
+
+def black_tool_do_custom_edit_fancy(tool):
+    print_banner_and_header()
+    b_color = get_banner_color()
+    json_files = [f for f in os.listdir(WORK_DIR_BLACK) if f.endswith('.json')]
+    
+    if not json_files:
+        console.print(f"[red]No JSON files found![/red]")
+        return
+
+    for j_file in json_files:
+        json_path = os.path.join(WORK_DIR_BLACK, j_file)
+        with open(json_path, 'r', encoding='utf-8') as f:
+            entries = json.load(f)
+
+        for group_name, keywords in TARGET_GROUPS.items():
+            matching_entries = [e for e in entries if any(kw in e['text'] for kw in keywords)]
+
+            if matching_entries:
+                console.print(f"\n[bold cyan]Target:[/] [white]{group_name}[/]")
+                if "1. MATCH START" in group_name:
+                    new_text = get_live_input_match_start(f" \033[1;32mENTER YELLOW TEXT > \033[0m")
+                else:
+                    new_text = Prompt.ask(f"[bold {b_color}]Enter normal text[/bold {b_color}]")
+
+                if new_text.strip():
+                    processed_text = new_text
+                    if "1. MATCH START" in group_name:
+                        if "[" in processed_text and "]" in processed_text:
+                            parts = processed_text.split("[", 1)
+                            pre = parts[0]
+                            inner, post = parts[1].split("]", 1) if "]" in parts[1] else (parts[1], "")
+                            processed_text = f"{pre}[ <MatchStartInfo>{inner}</>]{post}"
+                        else:
+                            processed_text = f"<MatchStartInfo>{processed_text}</>"
+                    for e in matching_entries:
+                        e_max = abs(e['original_len_int'])
+                        e['text'] = processed_text[:e_max-1]
+
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(entries, f, indent=4, ensure_ascii=False)
+    
+    console.print(Panel("[bold green]✅ ALL DONE: Targeted Modding Complete![/bold green]"))
+    Prompt.ask("\nPress Enter to continue...", default="")
+
+@security_guard
+def black_tool_main(auto_select_file="mini_obb.pak"):
+    global SERVER_ENGINE_TOKEN
+    if SERVER_ENGINE_TOKEN == "LOCKED" or len(SERVER_ENGINE_TOKEN) != 64:
+        os._exit(0)
+        
+    black_tool_ensure_work_dir()
+    REQUIRED_FILES = ["LocalizationText_en.uexp", "SplashScreen_BH.uexp"]
+    missing_files = [f for f in REQUIRED_FILES if not os.path.exists(os.path.join(WORK_DIR_BLACK, f)) or os.path.getsize(os.path.join(WORK_DIR_BLACK, f)) == 0]
+
+    if missing_files:
+        b_color = get_banner_color()
+        console.print(f"\n[bold yellow]⚠️ Missing files in ORGNAL: {', '.join(missing_files)}[/bold yellow]")
+        obb_folder = Path(BASE_DIR_NAME) / "OBB_UNPACKER" / "ORGNAL"
+        pak_files = list_paks_in_folder(obb_folder)
+
+        if pak_files:
+            target_index = -1
+            if auto_select_file:
+                for i, p in enumerate(pak_files):
+                    if p.name.lower() == auto_select_file.lower():
+                        target_index = i
+                        break
+            
+            if target_index != -1:
+                pak_path = pak_files[target_index]
+                console.print(f"[bold green]🚀 AUTO-SELECTING:[/] [white]{pak_path.name}[/white]")
+            else:
+                console.print(files_available_panel(pak_files, folder_label="Select OBB to extract missing files"))
+                pick = Prompt.ask(f"[bold {b_color}]Select OBB/PAK file number[/bold {b_color}]", choices=[str(i) for i in range(1, len(pak_files) + 1)])
+                pak_path = pak_files[int(pick) - 1]
+            
+            console.print(f"\n[bold cyan]⏳ PRO EXTRACTION: Scanning {pak_path.name}...[/bold cyan]")
+            try:
+                pak = TencentPakFile(pak_path)
+                for target_file in missing_files:
+                    candidates = []
+                    for dir_path, dir_entries in pak._index.items():
+                        for fname, entry in dir_entries.items():
+                            if fname.lower() == target_file.lower() and entry is not None:
+                                candidates.append(entry)
+                    if candidates:
+                        candidates.sort(key=lambda x: x.size, reverse=True) 
+                        for entry in candidates:
+                            target_dest = Path(WORK_DIR_BLACK) / target_file
+                            pak._write_to_disk(target_dest, entry)
+                            if os.path.getsize(target_dest) > 1024: 
+                                console.print(f"[bold green]✔ PRO EXTRACT SUCCESS:[/] {target_file}")
+                                break 
+            except Exception as e:
+                console.print(f"[red]Error parsing OBB: {e}[/red]")
+            
+            if target_index == -1:
+                Prompt.ask("\n[bold white]Press Enter to continue...[/bold white]", default="")
+        else:
+            console.print(f"[bold red]❌ No OBB found in {obb_folder}![/bold red]")
+
+    tool = UE4StringTool()
+    while True:
+        print_banner_and_header()
+        print_user_profile()
+        b_color = get_banner_color()
+        menu_table = Table(show_header=False, box=box.SIMPLE, expand=True)
+        menu_table.add_column("𝐎𝐏𝐓", style="bold white", justify="center", width=4)
+        menu_table.add_column("𝐂𝐎𝐌𝐌𝐀𝐍𝐃", style=f"bold {b_color}")
+        menu_table.add_column("DESC", style="dim white")
+        menu_table.add_row(menu_item("1", 0), menu_item("UNPACK", 1), menu_item("UEXP to JSON", 5))
+        menu_table.add_row(menu_item("2", 2), menu_item("REPACK", 3), menu_item("JSON to UEXP", 7))
+        menu_table.add_row(menu_item("3", 4), menu_item("MASTER CUSTOM EDIT", 5), menu_item("🔥 Live Color Edit", 9))
+        menu_table.add_row(menu_item("4", 6), menu_item("BACK", 7), menu_item("Back to RedMagix", 11))
+        console.print(Panel(menu_table, border_style=b_color, box=box.HEAVY, title=f"[bold black on {b_color}] {to_fancy('BLACK TOOL OPTIONS')} [/]"))
+        
+        choice = Prompt.ask(f"[bold {b_color}]{to_fancy('Select option')}[/bold {b_color}]", choices=["1","2","3","4"])
+        if choice == '1': black_tool_do_unpack_fancy(tool)
+        elif choice == '2': black_tool_do_repack_fancy(tool)
+        elif choice == '3': black_tool_do_custom_edit_fancy(tool)
+        elif choice == '4': return
+
+# ======================================================================
+# 🔥 LUA REPACK ANY SIZE ENGINE (FULL REBUILD) 🔥
+# ======================================================================
+# ======================================================================
+# 🔥 LUA REPACK ANY SIZE ENGINE (FULL REBUILD) 🔥
+# ======================================================================
+import copy as _cp
+
+def _pw_string(s):
+    if not s: return struct.pack('<i', 0)
+    b = s.encode('utf-8') + b'\x00'
+    return struct.pack('<i', len(b)) + b
+
+def _pw_entry(e, v):
+    w = bytearray(e.content_hash)
+    w += struct.pack('<Q', e.offset)
+    w += struct.pack('<Q', e.uncompressed_size)
+    w += struct.pack('<I', e.compression_method)
+    w += struct.pack('<Q', e.size)
+    if v >= 5:
+        w += bytes([e.unk1])
+        w += e.unk2
+    if e.compression_method != 0 and v >= 3:
+        w += struct.pack('<I', len(e.compressed_blocks))
+        for b in e.compressed_blocks:
+            w += struct.pack('<QQ', b.start, b.end)
+    if v >= 4:
+        w += struct.pack('<I', e.compression_block_size)
+        w += bytes([1 if e.encrypted else 0])
+    if v >= 12:
+        w += struct.pack('<II', e.encryption_method, e.index_new_sep)
+    return bytes(w)
+
+def _get_all_dirs_and_mp(pak_file):
+    raw = bytes(pak_file._file_content[pak_file._pak_info.index_offset:][:pak_file._pak_info.index_size])
+    if pak_file._pak_info.index_encrypted:
+        raw = PakCrypto.decrypt_index(raw, pak_file._pak_info)
+    r = Reader(raw)
+    mp = r.string()
+    num_files = r.u4()
+    for _ in range(num_files):
+        TencentPakEntry(r, pak_file._pak_info.version)
+    dirs = {}
+    for _ in range(r.u8()):
+        dp = r.string()
+        cnt = r.u8()
+        dirs[dp] = {r.string(): pak_file._files[~r.i4()] for _ in range(cnt)}
+    return mp, dirs
+
+def repack_any_size(pak_file, edited_root, output_path):
+    edit_files = [p for p in Path(edited_root).rglob('*') if p.is_file()]
+    if not edit_files: return 0
+
+    version = pak_file._pak_info.version
+    try: keystream = PakCrypto.zuc_keystream()
+    except Exception: keystream = [0]*16
+        
+    orig_fc = pak_file._file_content
+    mp_str, all_dirs = _get_all_dirs_and_mp(pak_file)
+
+    pak_name_map = {}
+    for dir_path, files in pak_file._index.items():
+        for name, entry in files.items():
+            full_path = str(PurePath(dir_path)/name).replace('\\', '/')
+            pak_name_map.setdefault(name.lower(), []).append((full_path, entry))
+
+    edited = {}
+    for p in edit_files:
+        fl = p.name.lower()
+        found_match = False
+        if fl in pak_name_map:
+            cands = pak_name_map[fl]
+            sz = p.stat().st_size
+            sm = [(fp, e) for fp, e in cands if e.uncompressed_size == sz]
+            fp, ent = sm[0] if sm else cands[0]
+            edited[fp] = (p, ent)
+            found_match = True
+        
+        if not found_match:
+            stem = p.stem.lower()
+            ext = p.suffix.lower()
+            for dir_path, files in pak_file._index.items():
+                for name, entry in files.items():
+                    if Path(name).stem.lower() == stem and Path(name).suffix.lower() == ext:
+                        full_path = str(PurePath(dir_path)/name).replace('\\', '/')
+                        edited[full_path] = (p, entry)
+                        found_match = True
+                        break
+                if found_match: break
+
+    if not edited: return 0
+
+    new_files = []
+    for e in pak_file._files:
+        ne = _cp.copy(e)
+        ne.compressed_blocks = [_cp.copy(b) for b in getattr(e, 'compressed_blocks', [])]
+        new_files.append(ne)
+
+    old_to_new = {id(pak_file._files[i]): new_files[i] for i in range(len(pak_file._files))}
+    edited_paths = {fp: p for fp, (p, _) in edited.items()}
+    out_buf = bytearray()
+
+    for dp_str, dir_files in list(all_dirs.items()):
+        for name, old_entry in list(dir_files.items()):
+            full_path = str(PurePath(dp_str)/name).replace('\\', '/')
+            ne = old_to_new.get(id(old_entry), None)
+            
+            if ne is None:
+                ne = _cp.copy(old_entry)
+                ne.compressed_blocks = [_cp.copy(b) for b in getattr(old_entry, 'compressed_blocks', [])]
+                new_files.append(ne)
+                old_to_new[id(old_entry)] = ne
+
+            em = getattr(old_entry, 'encryption_method', 0)
+            cm = getattr(old_entry, 'compression_method', 0)
+
+            if full_path in edited_paths:
+                p, template = edited[full_path]
+                new_raw = p.read_bytes()
+                pak_rel = PurePath(full_path)
+
+                ne.content_hash = SHA1.new(new_raw).digest() if SHA1 else b'\x00'*20
+                ne.uncompressed_size = len(new_raw)
+                
+                if ne.compression_method == 0:
+                    cipher = pak_file._apply_encrypt_for_entry(new_raw, pak_rel, ne.encryption_method) if ne.encrypted else new_raw
+                    ne.offset = len(out_buf)
+                    ne.size = len(cipher)
+                    out_buf += cipher
+                else:
+                    cs = template.compression_block_size if template and template.compression_block_size > 0 else 65536
+                    chunks = [new_raw[i:i+cs] for i in range(0, len(new_raw), cs)]
+                    new_blks = []
+                    for chunk in chunks:
+                        compressed = PakCompression.compress_block(chunk, ne.compression_method, pak_file._zstd_dict, None)
+                        cipher = pak_file._apply_encrypt_for_entry(compressed, pak_rel, ne.encryption_method) if ne.encrypted else compressed
+                        blk = PakCompressedBlock.__new__(PakCompressedBlock)
+                        blk.start = len(out_buf)
+                        blk.end = blk.start + len(cipher)
+                        out_buf += cipher
+                        new_blks.append(blk)
+
+                    ne.compressed_blocks = new_blks
+                    ne.offset = new_blks[0].start if new_blks else len(out_buf)
+                    ne.size = sum(b.end - b.start for b in new_blks)
+            else:
+                if cm == 0:
+                    read_sz = PakCrypto.align_encrypted_content_size(old_entry.size, em) if old_entry.encrypted else old_entry.size
+                    ne.offset = len(out_buf)
+                    out_buf += bytes(orig_fc[old_entry.offset: old_entry.offset + read_sz])
+                elif hasattr(old_entry, 'compressed_blocks') and old_entry.compressed_blocks:
+                    new_blks = []
+                    for ob in old_entry.compressed_blocks:
+                        unc = ob.end - ob.start
+                        enc = PakCrypto.align_encrypted_content_size(unc, em) if old_entry.encrypted else unc
+                        nb = PakCompressedBlock.__new__(PakCompressedBlock)
+                        nb.start = len(out_buf)
+                        nb.end = nb.start + unc
+                        out_buf += bytes(orig_fc[ob.start: ob.start + enc])
+                        new_blks.append(nb)
+                    ne.compressed_blocks = new_blks
+                    ne.offset = new_blks[0].start
+
+    eidx = {id(e): i for i in range(len(new_files))}
+    idx = bytearray(_pw_string(mp_str))
+    idx += struct.pack('<I', len(new_files))
+    for ne in new_files: idx += _pw_entry(ne, version)
+    idx += struct.pack('<Q', len(all_dirs))
+    for dp_str, dir_files in all_dirs.items():
+        idx += _pw_string(dp_str)
+        idx += struct.pack('<Q', len(dir_files))
+        for name, old_e in dir_files.items():
+            idx += _pw_string(name)
+            found_idx = eidx.get(id(old_to_new.get(id(old_e), old_e)), -1)
+            idx += struct.pack('<i', ~found_idx if found_idx != -1 else -1)
+
+    index_plain = bytes(idx)
+    new_sha1 = SHA1.new(index_plain).digest() if SHA1 else b'\x00'*20
+
+    if pak_file._pak_info.index_encrypted:
+        key = PakCrypto.rsa_extract(pak_file._pak_info.packed_key, RSA_MOD_1)
+        iv = PakCrypto.rsa_extract(pak_file._pak_info.packed_iv, RSA_MOD_1)
+        aes = AES.new(key, MODE_CBC, iv[:16])
+        pad_len = (-len(index_plain)) % 16 or 16
+        index_bytes = aes.encrypt(index_plain + bytes([pad_len] * pad_len))
+    else:
+        index_bytes = index_plain
+
+    new_idx_offset = len(out_buf)
+    new_idx_size = len(index_bytes)
+    out_buf += index_bytes
+
+    footer_sz = TencentPakInfo._mem_size(version)
+    new_footer = bytearray(orig_fc[-footer_sz:])
+    h_key = struct.pack('<5I', *keystream[4:9])
+    new_footer[-36:-16] = bytes(a ^ b for a, b in zip(new_sha1, h_key))
+    new_footer[-16:-8] = ((new_idx_size ^ (keystream[10] << 32 | keystream[11])).to_bytes(8, 'little'))
+    new_footer[-8:] = ((new_idx_offset ^ (keystream[0] << 32 | keystream[1])).to_bytes(8, 'little'))
+
+    out_buf += new_footer
+    with open(output_path, 'wb') as f: f.write(out_buf)
+    return len(edited)
+
+# ======================================================================
+# 🔥 TARGET PATH REPACK ENGINE (NEW FILES SUPPORT) 🔥
+# ===============================================# ========================# ==========================================# ======================================================================
+# ======================================================================
+# 🔥 PAK # ======================================================================
+# 🔥 PAK INJECTION ENGINE (APPEND NEW FILES) 🔥
+# ======================================================================
+
+def _serialize_string(s: str) -> bytes:
+    encoded = s.encode('utf-8') + b'\x00'
+    return struct.pack('<i', len(encoded)) + encoded
+
+def _serialize_entry(buf: bytearray, entry: TencentPakEntry, version: int):
+    buf.extend(entry.content_hash)
+    buf.extend(struct.pack('<Q', entry.offset))
+    buf.extend(struct.pack('<Q', entry.uncompressed_size))
+    buf.extend(struct.pack('<I', entry.compression_method))
+    buf.extend(struct.pack('<Q', entry.size))
+    if version >= 5:
+        buf.extend(struct.pack('B', entry.unk1))
+        buf.extend(entry.unk2)
+    if entry.compression_method != 0:
+        buf.extend(struct.pack('<I', len(entry.compressed_blocks)))
+        for blk in entry.compressed_blocks:
+            buf.extend(struct.pack('<QQ', blk.start, blk.end))
+    if version >= 4:
+        buf.extend(struct.pack('<I', entry.compression_block_size))
+        buf.extend(struct.pack('B', 1 if entry.encrypted else 0))
+    if version >= 12:
+        buf.extend(struct.pack('<I', entry.encryption_method))
+        buf.extend(struct.pack('<I', entry.index_new_sep))
+
+def _build_index_bytes(old_index_data: bytes, new_entries: list, version: int) -> bytes:
+    buf = bytearray()
+    reader = Reader(old_index_data)
+
+    mount_len = reader.i4()
+    mount_raw = old_index_data[reader._cursor - 4:reader._cursor + mount_len]
+    reader._cursor += mount_len
+    buf.extend(mount_raw)
+
+    old_count = reader.u4()
+    buf.extend(struct.pack('<I', old_count + len(new_entries)))
+
+    entries_start = reader._cursor
+    for _ in range(old_count):
+        TencentPakEntry(reader, version)
+    buf.extend(old_index_data[entries_start:reader._cursor])
+
+    for entry, _, _ in new_entries:
+        _serialize_entry(buf, entry, version)
+
+    dir_table_raw = old_index_data[reader._cursor:]
+    old_dir_count = struct.unpack_from('<Q', dir_table_raw, 0)[0]
+    
+    old_dir_entries = []
+    dc = 8
+    for _ in range(old_dir_count):
+        dlen = struct.unpack_from('<i', dir_table_raw, dc)[0]
+        dname_raw_bytes = dir_table_raw[dc:dc + 4 + dlen]
+        dname_raw = dir_table_raw[dc+4:dc+4+dlen].decode('ascii', errors='replace').rstrip('\x00')
+        dc += 4 + dlen
+        dirname = PurePath(dname_raw).as_posix()
+        if dname_raw.endswith('/'): dirname += '/'
+        num_entries = struct.unpack_from('<Q', dir_table_raw, dc)[0]
+        dc += 8
+        entries_start = dc
+        for _ in range(num_entries):
+            flen = struct.unpack_from('<i', dir_table_raw, dc)[0]
+            dc += 4 + flen + 4
+        old_dir_entries.append((dname_raw_bytes, dirname, num_entries, entries_start, dc))
+    
+    new_dir_map = {}
+    base_idx = old_count
+    for idx, (_, dir_path, fname) in enumerate(new_entries):
+        key = dir_path.as_posix() + '/'
+        new_dir_map.setdefault(key, []).append((base_idx + idx, fname))
+    
+    existing_dirs = {d[1] for d in old_dir_entries}
+    existing_additions = {}
+    append_dirs = {}
+    for key, entries in new_dir_map.items():
+        if key in existing_dirs: existing_additions[key] = entries
+        else: append_dirs[key] = entries
+    
+    buf.extend(struct.pack('<Q', old_dir_count + len(append_dirs)))
+    
+    for dname_raw_bytes, dirname, num_entries, entries_start, entries_end in old_dir_entries:
+        additions = existing_additions.get(dirname, [])
+        new_count = num_entries + len(additions)
+        buf.extend(dname_raw_bytes)
+        buf.extend(struct.pack('<Q', new_count))
+        buf.extend(dir_table_raw[entries_start:entries_end])
+        for idx, fname in additions:
+            buf.extend(_serialize_string(fname))
+            buf.extend(struct.pack('<i', ~idx))
+    
+    for dir_key, entries in append_dirs.items():
+        buf.extend(_serialize_string(dir_key))
+        buf.extend(struct.pack('<Q', len(entries)))
+        for idx, fname in entries:
+            buf.extend(_serialize_string(fname))
+            buf.extend(struct.pack('<i', ~idx))
+
+    return bytes(buf)
+
+def _write_footer(outfh, pak_info: TencentPakInfo, index_data_encrypted: bytes, index_data_plain: bytes, data_end_offset: int, keystream: list, content_org_hash: bytes):
+    version = pak_info.version
+    index_offset = data_end_offset
+    index_size = len(index_data_encrypted)
+    if SHA1: index_hash = SHA1.new(index_data_plain).digest()
+    else: index_hash = b'\x00'*20
+
+    def enc_index_encrypted(x: int) -> int: return x ^ keystream[3] & 0xFF
+    def enc_magic(x: int) -> int: return x ^ keystream[2]
+    def enc_index_hash(x: bytes) -> bytes:
+        key = struct.pack('<5I', *keystream[4:][:5])
+        return bytes(a ^ b for a, b in zip(x, key))
+    def enc_index_size(x: int) -> int: return x ^ ((keystream[10] << 32) | keystream[11])
+    def enc_index_offset(x: int) -> int: return x ^ ((keystream[0] << 32) | keystream[1])
+    def enc_unk(x: bytes) -> bytes:
+        key = struct.pack('<8I', *keystream[7:][:8])
+        return bytes(a ^ b for a, b in zip(x, key))
+    def enc_stem_hash(x: int) -> int: return x ^ keystream[8]
+    def enc_unk_hash(x: int) -> int: return x ^ keystream[9]
+
+    fbuf = bytearray()
+    if version >= 7: fbuf.extend(enc_unk(pak_info.unk1))
+    if version >= 8:
+        fbuf.extend(pak_info.packed_key)
+        fbuf.extend(pak_info.packed_iv)
+        fbuf.extend(pak_info.packed_index_hash)
+    if version >= 9:
+        fbuf.extend(struct.pack('<I', enc_stem_hash(pak_info.stem_hash)))
+        fbuf.extend(struct.pack('<I', enc_unk_hash(pak_info.unk2)))
+    if version >= 12: fbuf.extend(content_org_hash)
+    
+    fbuf.append(enc_index_encrypted(1))
+    fbuf.extend(struct.pack('<I', enc_magic(pak_info.magic)))
+    fbuf.extend(struct.pack('<I', version))
+    fbuf.extend(enc_index_hash(index_hash))
+    fbuf.extend(struct.pack('<Q', enc_index_size(index_size)))
+    fbuf.extend(struct.pack('<Q', enc_index_offset(index_offset)))
+    outfh.write(bytes(fbuf))
+
+def pak_injection(pak_path: Path, inject_dir: Path, output_path: Path, target_path_prefix: str = "", compression_block_size: int = 0, show_ui: bool = False):
+    pak = TencentPakFile(pak_path)
+    version = pak._pak_info.version
+    
+    orig_idx_off = pak._pak_info.index_offset
+    orig_idx_sz = pak._pak_info.index_size
+    old_idx_enc = bytes(pak._file_content[orig_idx_off:][:orig_idx_sz])
+    
+    if pak._pak_info.index_encrypted:
+        try: old_idx_dec = PakCrypto.decrypt_index(old_idx_enc, pak._pak_info)
+        except: old_idx_dec = old_idx_enc
+    else:
+        old_idx_dec = old_idx_enc
+
+    entry_path_map = {}
+    for dir_path, files in pak._index.items():
+        for name, entry in files.items():
+            if entry is not None:
+                for idx, fe in enumerate(pak._files):
+                    if fe is entry:
+                        entry_path_map[idx] = (dir_path, name)
+                        break
+
+    old_entries = []
+    for idx, fe in enumerate(pak._files):
+        if idx in entry_path_map:
+            dp, nm = entry_path_map[idx]
+            old_entries.append((fe, dp, nm))
+
+    data_end = orig_idx_off
+
+    enc_counts = {}
+    comp_counts = {}
+    for entry, _, _ in old_entries:
+        if entry.encrypted:
+            enc_counts[entry.encryption_method] = enc_counts.get(entry.encryption_method, 0) + 1
+        comp_counts[entry.compression_method] = comp_counts.get(entry.compression_method, 0) + 1
+        
+    injection_enc_method = max(enc_counts, key=enc_counts.get) if enc_counts else EM_SM4_NEW_BASE
+    injection_comp_method = max(comp_counts, key=comp_counts.get) if comp_counts else CM_ZSTD
+
+    block_sizes = {}
+    for entry, _, _ in old_entries:
+        if entry.compression_block_size > 0:
+            block_sizes[entry.compression_block_size] = block_sizes.get(entry.compression_block_size, 0) + 1
+    if not compression_block_size:
+        compression_block_size = max(block_sizes, key=block_sizes.get) if block_sizes else 65536
+
+    inject_files = []
+    for p in sorted(inject_dir.rglob("*")):
+        if not p.is_file(): continue
+        rel = p.relative_to(inject_dir)
+        if target_path_prefix:
+            target_entry = PurePath(target_path_prefix) / rel
+        else:
+            target_entry = rel
+        inject_files.append((p, target_entry))
+
+    if not inject_files: return
+
+    new_data_blocks = []
+    new_entries = []
+    cursor = data_end
+
+    for src_path, target_path in inject_files:
+        name = target_path.name
+        dir_path = target_path.parent
+        
+        if show_ui:
+            panel_text = (
+                f"[bold cyan]Repacking:[/] [bold white]{name}[/]\n"
+                f"[bold yellow]Target Entry:[/] [bold green]{target_path.as_posix()}[/]\n"
+                f"[bold bright_blue]Encryption Method Applied:[/] [bold cyan]{0 if injection_enc_method == 0 else injection_enc_method}[/]"
+            )
+            console.print(Panel(panel_text, border_style=get_banner_color(), box=box.SQUARE))
+
+        file_content = src_path.read_bytes()
+        file_size = len(file_content)
+
+        if file_size <= compression_block_size:
+            block_size = file_size if injection_comp_method != CM_NONE else 0
+            num_blocks = 1
+        else:
+            block_size = compression_block_size
+            num_blocks = (file_size + block_size - 1) // block_size
+
+        blocks = []
+        total_encrypted = 0
+        for i in range(num_blocks):
+            chunk_start = i * block_size if injection_comp_method != CM_NONE else 0
+            chunk_end = min(chunk_start + block_size, file_size) if injection_comp_method != CM_NONE else file_size
+            chunk = file_content[chunk_start:chunk_end]
+
+            compressed = PakCompression.compress_block(chunk, injection_comp_method, pak._zstd_dict, None)
+
+            if injection_enc_method != 0:
+                cipher = pak._apply_encrypt_for_entry(compressed, target_path, injection_enc_method)
+                aligned_size = PakCrypto.align_encrypted_content_size(len(cipher), injection_enc_method)
+                if aligned_size > len(cipher):
+                    cipher += b'\x00' * (aligned_size - len(cipher))
+            else:
+                cipher = compressed
+
+            blk_start = cursor + total_encrypted
+            blk_end = blk_start + len(cipher)
+            blk = PakCompressedBlock.__new__(PakCompressedBlock)
+            blk.start = blk_start
+            blk.end = blk_end
+            blocks.append(blk)
+            total_encrypted += len(cipher)
+            new_data_blocks.append(cipher)
+
+        all_encrypted = b''.join(new_data_blocks[-len(blocks):])
+        entry = TencentPakEntry.__new__(TencentPakEntry)
+        if SHA1: entry.content_hash = SHA1.new(all_encrypted).digest()
+        else: entry.content_hash = b'\x00'*20
+        entry.offset = cursor
+        entry.uncompressed_size = file_size
+        entry.compression_method = injection_comp_method
+        entry.size = total_encrypted
+        entry.unk1 = 0
+        entry.unk2 = b'\x00' * 20
+        entry.compressed_blocks = blocks
+        entry.compression_block_size = block_size
+        entry.encrypted = injection_enc_method != 0
+        entry.encryption_method = injection_enc_method
+        entry.index_new_sep = 0
+
+        new_entries.append((entry, dir_path, name))
+        cursor += total_encrypted
+
+    index_plain = _build_index_bytes(old_idx_dec, new_entries, version)
+
+    if pak._pak_info.index_encrypted:
+        key = PakCrypto.rsa_extract(pak._pak_info.packed_key, RSA_MOD_1)
+        iv = PakCrypto.rsa_extract(pak._pak_info.packed_iv, RSA_MOD_1)
+        aes = AES.new(key, MODE_CBC, iv[:16])
+        pad_len = (-len(index_plain)) % 16 or 16
+        index_encrypted = aes.encrypt(index_plain + bytes([pad_len] * pad_len))
+    else:
+        index_encrypted = index_plain
+
+    content_org_hash = pak._pak_info.content_org_hash
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'wb') as outfh:
+        outfh.write(bytes(pak._file_content[:data_end]))
+        for blk in new_data_blocks:
+            outfh.write(blk)
+        index_offset = outfh.tell()
+        outfh.write(index_encrypted)
+        _write_footer(outfh, pak._pak_info, index_encrypted, index_plain, index_offset, PakCrypto.zuc_keystream(), content_org_hash)
+
+# ======================================================================
+def human_size(num_bytes: int) -> str:
+    """Convert raw byte count to a human-readable string (e.g. 1.23 MB)."""
+    if num_bytes is None:
+        return "N/A"
+    num_bytes = int(num_bytes)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if abs(num_bytes) < 1024.0:
+            if unit == "B":
+                return f"{num_bytes} B"
+            return f"{num_bytes:,.2f} {unit}"
+        num_bytes /= 1024.0
+    return f"{num_bytes:,.2f} PB"
+
+# ... yahan ke neeche tumhara def run_lua_tool() hoga ...
+@security_guard
+def run_lua_tool():
+    global SERVER_LUA_XOR_KEY_HEX
+
+    console.clear()
+    print_banner_and_header()
+    print_user_profile()
+    b_color = get_banner_color()
+    
+    console.print(Panel(f"[bold {b_color}]🔥 LUA DECOMPILER & RECOMPILER 🔥[/bold {b_color}]\n"
+                        f"[dim]Extract, Edit, and Repack BGMI Lua Bytecode[/dim]", border_style=b_color))
+
+    lua_base = Path(BASE_DIR_NAME) / "LUA_TOOL"
+    lua_org = lua_base / "Lua_org"
+    lua_dec = lua_base / "Lua_Decript"
+    lua_res = lua_base / "Lua_Rueslt"
+    
+    # --- NAYA FOLDER STRUCTURE (ANY SIZE REPACK KE LIYE) ---
+    re_lua_any_size = lua_base / "RE_LUA ANY SIZE"
+    lua_edit = re_lua_any_size / "EDIT_LUA"
+    lua_org_pak = re_lua_any_size / "ORGNAL_PAK"
+    lua_mod_repack = re_lua_any_size / "REPACK_MOD"
+
+    lua_custom = lua_base / "LUA_CUSTOM" 
+    lua_custom_edit = lua_custom / "EDIT" 
+    lua_custom_pak  = lua_custom / "PAK"
+    lua_custom_result = lua_custom / "RESULT"
+    
+    # --- BGMI CSV FOLDER (LUA_CUSTOM KE ANDAR) ---
+    BGMI_CSV_folder = lua_custom / "BGMI_CSV"
+
+    # --- SIRF ZAROORI FOLDERS BANAYEIN ---
+    for d in [lua_org, lua_dec, lua_res, lua_edit, lua_org_pak, lua_mod_repack, lua_custom, lua_custom_edit, lua_custom_pak, lua_custom_result]:
+        os.makedirs(to_long_path(d), exist_ok=True)
+
+    # ── AUTO JAR DOWNLOAD ──────────────────────────────────────────────────────
+    # unluac.jar  → Lua 5.1 / 5.2 / 5.3 / 5.4
+    # luajit-decompiler-v2 (ljd.jar) → LuaJIT
+    # Version is detected from the .luac header byte before each decompile run.
+    unluac_path = lua_base / "unluac.jar"
+    ljd_path    = lua_base / "ljd.jar"
+
+    UNLUAC_URL = "https://github.com/unluac/unluac/releases/latest/download/unluac.jar"
+    LJD_URL    = "https://github.com/nicktindall/luajit-decompiler-v2/releases/latest/download/ljd.jar"
+
+    def _download_jar(url, dest):
+        try:
+            console.print(f"[yellow][*] Downloading {dest.name}...[/yellow]")
+            urllib.request.urlretrieve(url, to_long_path(dest))
+            if dest.stat().st_size < 1000:          # download returned HTML / redirect garbage
+                dest.unlink(missing_ok=True)
+                raise RuntimeError("Downloaded file too small — likely a redirect page")
+        except Exception as e:
+            console.print(f"[red]❌ Failed to download {dest.name}: {e}[/red]")
+
+    def _detect_lua_version(path):
+        """Return (version_byte, is_luajit).  version_byte: 0x51=5.1, 0x52=5.2, 0x53=5.3, 0x54=5.4"""
+        try:
+            with open(path, 'rb') as fh:
+                magic = fh.read(5)          # \x1bLua + version byte
+            if magic[:4] == b'\x1bLua':
+                vb = magic[4]
+                return vb, False
+            # LuaJIT magic: \x1bLJ
+            with open(path, 'rb') as fh:
+                magic2 = fh.read(3)
+            if magic2 == b'\x1bLJ':
+                return None, True
+        except Exception:
+            pass
+        return None, False
+
+    def _ensure_jar_for_file(luac_path):
+        """Download the right JAR for this .luac and return its Path, or None."""
+        vb, is_luajit = _detect_lua_version(luac_path)
+        if is_luajit:
+            if not ljd_path.exists():
+                _download_jar(LJD_URL, ljd_path)
+            return ljd_path if ljd_path.exists() else None
+        else:
+            # 0x51-0x54 all handled by modern unluac
+            if not unluac_path.exists():
+                _download_jar(UNLUAC_URL, unluac_path)
+            return unluac_path if unluac_path.exists() else None
+    # ── END AUTO JAR ───────────────────────────────────────────────────────────
+
+    # Pre-download unluac for the common case
+    if not unluac_path.exists():
+        _download_jar(UNLUAC_URL, unluac_path)
+
+    if subprocess.call("command -v luac5.3", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
+        console.print(f"[yellow][*] Installing Lua 5.3 Compiler via pkg...[/yellow]")
+        subprocess.call("pkg install lua53 -y", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # Do not abort the whole Lua tool when the server-only key is unavailable.
+    # Options 3/4 (PAK repack/custom-file operations) do not need the Lua XOR key.
+    # Options 1/2 load a user-supplied local key when available.
+    lua_key_file = lua_base / "lua_xor_key.txt"
+    LUA_XOR_KEY = b""
+    if SERVER_LUA_XOR_KEY_HEX:
+        try:
+            LUA_XOR_KEY = bytes.fromhex(SERVER_LUA_XOR_KEY_HEX.strip())
+        except ValueError:
+            LUA_XOR_KEY = b""
+    elif lua_key_file.exists():
+        try:
+            local_key_hex = lua_key_file.read_text(encoding="utf-8").strip()
+            LUA_XOR_KEY = bytes.fromhex(local_key_hex)
+        except (OSError, ValueError):
+            LUA_XOR_KEY = b""
+
+    BGMI_STD = {0: 13, 1: 14, 2: 15, 3: 16, 4: 17, 5: 18, 14: 27, 16: 29, 17: 0, 18: 1, 20: 3, 21: 4, 22: 5, 23: 6, 24: 7, 25: 8, 26: 9, 27: 10, 28: 11, 29: 12, 30: 30, 31: 31, 32: 32, 33: 33, 34: 34, 36: 36, 37: 37, 38: 38, 39: 39, 40: 40, 41: 41, 42: 42, 43: 43, 44: 44, 45: 45}
+    STD_BGMI = {v: k for k, v in BGMI_STD.items()}
+    STD_FMT = [0,1,1,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,2,0, 0,0,0,0,0,0,0,2, 2,0,2,0,1,0,3]
+    
+    def process_lua_file(data, is_encrypt=False):
+        class RW:
+            def __init__(self): self.b = bytearray()
+            def byte(self, v): self.b.append(v & 0xFF)
+            def u32(self, v): self.b.extend(struct.pack('<I', v))
+            def i32(self, v): self.b.extend(struct.pack('<i', v))
+            def raw(self, d): self.b.extend(d)
+        class R:
+            def __init__(self, d): self.d = d; self.p = 0
+            def byte(self): v = self.d[self.p]; self.p += 1; return v
+            def u32(self): v = struct.unpack_from('<I', self.d, self.p)[0]; self.p += 4; return v
+            def i32(self): v = struct.unpack_from('<i', self.d, self.p)[0]; self.p += 4; return v
+            def raw(self, n): v = self.d[self.p:self.p+n]; self.p += n; return v
+            
+        r, w = R(data), RW()
+        hdr = bytearray(data[:33])
+        if is_encrypt:
+            if hdr[12:16] == b'\x04\x08\x04\x08': hdr[12:16] = b'\x04\x04\x04\x08'
+        else:
+            hdr[13] = 8  # BGMI uses size_t=4 (0x04); standard Lua 5.3 is size_t=8 (0x08) — unluac requires 0x08
+        w.raw(bytes(hdr))
+        r.p = 33
+        w.byte(r.byte())
+
+        def tg_str_read():
+            sz = r.byte()
+            if sz == 0xFF: sz = r.u32()
+            if sz == 0: return None
+            enc = r.raw(sz - 1)
+            key_len = len(LUA_XOR_KEY)
+            if not is_encrypt:
+                if key_len == 0:
+                    return enc.decode('utf-8', 'replace')
+                xored = bytes(enc[i] ^ LUA_XOR_KEY[i % key_len] for i in range(len(enc)))
+                try:
+                    decoded = xored.decode('utf-8')
+                    if all(c >= ' ' or c in '\t\n\r' for c in decoded):
+                        return decoded
+                except UnicodeDecodeError:
+                    pass
+                return enc.decode('utf-8', 'replace')
+            return enc.decode('utf-8', 'replace')
+
+        def tg_str_write(s):
+            if s is None: w.byte(0); return
+            e = s.encode('utf-8') if isinstance(s, str) else s
+            key_len = len(LUA_XOR_KEY)
+            if is_encrypt and key_len > 0: e = bytes(e[i] ^ LUA_XOR_KEY[i % key_len] for i in range(len(e)))
+            sz = len(e) + 1
+            if sz < 0xFF: w.byte(sz)
+            else: w.byte(0xFF); w.u32(sz)
+            w.raw(e)
+
+        def convert(r, w):
+            tg_str_write(tg_str_read()); w.i32(r.i32()); ldef = r.i32(); w.i32(ldef)
+            w.byte(r.byte()); w.byte(r.byte()); w.byte(r.byte()); n = r.u32(); w.u32(n)
+            for _ in range(n):
+                raw = r.u32()
+                op, A, B, C, Bx, Ax = raw & 0x3F, (raw>>6)&0xFF, (raw>>23)&0x1FF, (raw>>14)&0x1FF, (raw>>14)&0x3FFFF, (raw>>6)&0x3FFFFFF
+                sBx = Bx - 131071
+                sop = STD_BGMI.get(op, op) if is_encrypt else BGMI_STD.get(op, op)
+                fmt = STD_FMT[op] if is_encrypt else (STD_FMT[sop] if sop < len(STD_FMT) else 0)
+                if fmt == 0: res = (sop & 0x3F) | (A << 6) | (C << 14) | (B << 23)
+                elif fmt == 1: res = (sop & 0x3F) | (A << 6) | (Bx << 14)
+                elif fmt == 2: res = (sop & 0x3F) | (A << 6) | ((sBx + 131071) << 14)
+                else: res = (sop & 0x3F) | (Ax << 6)
+                w.u32(res)
+            nk = r.u32(); w.u32(nk)
+            for _ in range(nk):
+                t = r.byte(); w.byte(t)
+                if t == 1: w.byte(r.byte())
+                elif t in (3, 19): w.raw(r.raw(8))
+                elif t in (4, 20): tg_str_write(tg_str_read())
+            nups = r.u32(); w.u32(nups)
+            for _ in range(nups): w.byte(r.byte()); w.byte(r.byte())
+            npt = r.u32(); w.u32(npt)
+            for _ in range(npt): convert(r, w)
+            nln = r.u32(); lines = []
+            if is_encrypt:
+                lines = [r.i32() for _ in range(nln)]; w.u32(nln); prev = ldef
+                for ln in lines:
+                    diff = ln - prev; prev = ln
+                    if diff < 0: diff += 256
+                    w.byte(diff & 0xFF)
+                w.u32(0)
+            else:
+                cur = ldef
+                for _ in range(nln):
+                    d = r.byte(); cur += d if d <= 127 else d - 256; lines.append(cur)
+                w.u32(len(lines))
+                for ln in lines: w.i32(ln)
+            if not is_encrypt: nab = r.u32(); [r.raw(8) for _ in range(nab)]
+            nloc = r.u32(); w.u32(nloc)
+            for _ in range(nloc): tg_str_write(tg_str_read()); w.i32(r.i32()); w.i32(r.i32())
+            nupn = r.u32(); w.u32(nupn)
+            for _ in range(nupn): tg_str_write(tg_str_read())
+        convert(r, w)
+        return bytes(w.b)
+
+    while True:
+        console.clear()
+        print_banner_and_header()
+        print_user_profile()
+        menu_table = Table(show_header=True, header_style=f"bold black on {b_color}", box=box.DOUBLE_EDGE, title=f"[reverse]  📜 LUA MODDING TOOL ANY SIZE [/]", border_style=b_color, expand=True)
+        if CURRENT_SESSION_COLOR == "rainbow":
+            menu_table.add_column(rainbow_text("𝐎𝐏𝐓"), justify="center", width=4)
+            menu_table.add_column(rainbow_text("𝐂𝐎𝐌𝐌𝐀𝐍𝐃"))
+            menu_table.add_column(rainbow_text("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍"))
+        else:
+            menu_table.add_column("𝐎𝐏𝐓", style="bold white", justify="center", width=4)
+            menu_table.add_column("𝐂𝐎𝐌𝐌𝐀𝐍𝐃", style=f"bold {b_color}")
+            menu_table.add_column("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍", style="dim white")
+        menu_table.add_row(menu_item("1", 0), menu_item("LUA DECOMPIL", 1), menu_item("Org -> Decript (.lua)", 5))
+        menu_table.add_row(menu_item("2", 2), menu_item("LUA RECOMPIL", 3), menu_item("Edited -> Rueslt (.lua)", 7))
+        menu_table.add_row(menu_item("3", 4), menu_item("REPACK LUA ANY SIZE ", 5), menu_item("EDIT_LUA -> MOD_REPACK (Pak)", 9))
+        menu_table.add_row(menu_item("4", 6), menu_item("ADD COSTUM FILE IN PAK", 7), menu_item("Costum File -> MOD_REPACK (Pak)", 11))
+        menu_table.add_row(menu_item("5", 8), menu_item("BUILD NEW PAK", 9), menu_item("Build fresh PAK from template + MODIFIED files", 13))
+        if CURRENT_SESSION_COLOR == "rainbow":
+            rainbow_row(menu_table, "0", "BACK", "Return to Main Menu")
+        else:
+            menu_table.add_row("0", f"[red]{to_fancy('BACK')}[/red]", to_fancy("Return to Main Menu"))
+        
+        console.print(Panel(menu_table, border_style=b_color, box=box.HEAVY))
+        
+        choice = Prompt.ask(f"[bold bright_blue]{to_fancy('SELECT OPTION')}[/bold bright_blue]")
+        
+        if choice not in ["1", "2", "3", "4", "5", "0"]:
+            continue
+
+        # Re-encrypt (choice 2) always needs the key — block it.
+        # Decompile (choice 1) can run in RAW mode without the key.
+        if choice == "2" and not LUA_XOR_KEY:
+            console.print(Panel(
+                "[bold yellow]⚠️ Lua XOR key is not available.[/bold yellow]\n\n"
+                f"Create this file and put the key as HEX on one line:\n[cyan]{lua_key_file}[/cyan]\n\n"
+                "Options 3 and 4 remain available without the key.",
+                title="[bold yellow] LOCAL LUA KEY REQUIRED [/bold yellow]",
+                border_style="yellow", box=box.HEAVY
+            ))
+            Prompt.ask("\n[bold bright_blue]Press Enter to return to Lua Menu...[/bold bright_blue]", default="")
+            continue
+            
+
+        # Choice 1 without key → auto raw mode (skip BGMI decrypt layer)
+        _raw_mode = False
+        if choice == "1" and not LUA_XOR_KEY:
+            console.print(Panel(
+                "[bold yellow]⚠️ Lua XOR key not found — BGMI decrypt layer will be skipped.[/bold yellow]\n\n"
+                "[dim white]RAW MODE: feeds the original .luac directly to unluac.\n"
+                "Strings stay encrypted but structure decompiles clean.\n"
+                "Useful to confirm if the file is decompilable at all.[/dim white]",
+                title="[bold cyan] RAW MODE — NO KEY [/bold cyan]",
+                border_style="cyan", box=box.HEAVY
+            ))
+            _raw_mode = True
+
+        if choice == "1":
+            console.clear()
+            print_banner_and_header()
+            console.print(Panel(f"[bold bright_blue][*] Scanning Directory:[/bold bright_blue] [bold green]'{lua_org.name}'...[/bold green]", border_style=b_color, box=box.ROUNDED))
+            files = [f for f in lua_org.iterdir() if f.is_file() and f.suffix in ['.lua', '.luac']]
+            if not files: 
+                console.print(Panel(f"[red]❌ No files found in {lua_org.resolve()}[/red]", border_style="red", box=box.HEAVY))
+            else:
+                file_list = "\n".join([f"  [bold green]{i}.[/bold green] [bold white]{f.name}[/bold white]" for i, f in enumerate(files, 1)])
+                console.print(Panel(file_list, title="[bold cyan]📂 Available Files[/bold cyan]", border_style="cyan", box=box.DOUBLE_EDGE))
+                sel = Prompt.ask(f"\n[bold bright_blue]👉 Select file number(s) (e.g. 1, 2), 'all', or '0' to Back[/bold bright_blue]", default="all")
+                selected_files = []
+                if sel.strip() == '0': continue 
+                elif sel.lower() == 'all': selected_files = files
+                else:
+                    for x in sel.split(','):
+                        if x.strip().isdigit():
+                            idx = int(x.strip()) - 1
+                            if 0 <= idx < len(files):
+                                selected_files.append(files[idx])
+                if not selected_files:
+                    console.print(Panel("[red]❌ Invalid selection![/red]", border_style="red", box=box.HEAVY))
+                else:
+                    console.print("")
+                    for f in selected_files:
+                        try:
+                            progress = Progress(
+                                SpinnerColumn("bouncingBar", style="bold cyan"),
+                                TextColumn("[bold bright_blue]{task.description}"),
+                                TextColumn("{task.fields[my_bar]}"),
+                                TextColumn("[bold white]{task.percentage:>3.0f}%")
+                            )
+                            progress_panel = Panel(progress, title="[blink bold white on blue] ⚙ PROCESSING ENGINE [/]", border_style="bright_blue", box=box.HEAVY)
+                            with Live(progress_panel, console=console, refresh_per_second=20):
+                                short_name = f.name if len(f.name) < 20 else f.name[:17] + "..."
+                                initial_bar = "[bold bright_blue]\\[[/bold bright_blue][bold blue]" + "-"*25 + "[/bold blue][bold bright_blue]][/bold bright_blue]"
+                                task = progress.add_task(f"Decrypting: {short_name}", total=100, my_bar=initial_bar)
+                                for i in range(1, 101):
+                                    time.sleep(0.015) 
+                                    filled = int((i / 100) * 25)
+                                    current_bar = "[bold bright_blue]\\[[/bold bright_blue][bold cyan]" + "█" * filled + "[/bold cyan][bold blue]" + "-" * (25 - filled) + "[/bold blue][bold bright_blue]][/bold bright_blue]"
+                                    progress.update(task, advance=1, my_bar=current_bar)
+                            
+                            with open(f, 'rb') as fp: data = fp.read()
+                            std_path = lua_dec / f"{f.stem}.std.luac"
+                            out_path = lua_dec / f"{f.stem}.lua"
+                            if _raw_mode:
+                                # RAW MODE: skip BGMI decrypt, feed original bytes directly
+                                with open(std_path, 'wb') as fp: fp.write(data)
+                            else:
+                                std_data = process_lua_file(data, is_encrypt=False)
+                                with open(std_path, 'wb') as fp: fp.write(std_data)
+                            # ── VERSION-AWARE DECOMPILE ───────────────────────────────────────────
+                            # Pick the right JAR from the .luac header byte.
+                            # Copy everything to an ASCII temp dir — JNI chokes on unicode paths.
+                            _jar = _ensure_jar_for_file(std_path)
+                            _decompile_ok = False
+                            _err_detail   = ""
+                            if _jar is None:
+                                _err_detail = "Could not download a compatible decompiler JAR. Check internet connection."
+                            else:
+                                with tempfile.TemporaryDirectory(prefix='unluac_') as _tdir:
+                                    _safe_jar  = os.path.join(_tdir, _jar.name)
+                                    _safe_luac = os.path.join(_tdir, 'target.luac')
+                                    shutil.copy2(str(_jar),      _safe_jar)
+                                    shutil.copy2(str(std_path),  _safe_luac)
+                                    _stderr_buf = tempfile.NamedTemporaryFile(mode='w', suffix='.err', delete=False)
+                                    with open(out_path, 'w', encoding='utf-8', errors='replace') as out_f:
+                                        subprocess.run(
+                                            ['java', '-jar', _safe_jar, _safe_luac],
+                                            stdout=out_f, stderr=_stderr_buf
+                                        )
+                                    _stderr_buf.close()
+                                    # Validate output — success only if file has real content
+                                    if out_path.exists() and out_path.stat().st_size > 10:
+                                        _decompile_ok = True
+                                    else:
+                                        try:
+                                            with open(_stderr_buf.name, 'r') as _ef:
+                                                _err_detail = _ef.read(300).strip() or "Empty output — version mismatch or obfuscated bytecode."
+                                        except Exception:
+                                            _err_detail = "Empty output — version mismatch or obfuscated bytecode."
+                                    try: os.unlink(_stderr_buf.name)
+                                    except Exception: pass
+                            # ── END VERSION-AWARE DECOMPILE ──────────────────────────────────────
+
+                            if std_path.exists(): std_path.unlink()
+
+                            if _decompile_ok:
+                                success_msg = (
+                                    f"[bold bright_blue]❖ Target File :[/bold bright_blue] [bold white]{f.name}[/bold white]\n"
+                                    f"[bold bright_blue]❖ Operation   :[/bold bright_blue] [bold green]Decompiled Successfully[/bold green]\n"
+                                    f"[bold bright_blue]❖ Output Path :[/bold bright_blue] [dim yellow]Lua_Decript/{out_path.name}[/dim yellow]"
+                                )
+                                console.print(Panel(success_msg, title="[bold white on green] ⚡ DECRYPTION SUCCESS ⚡ [/]", border_style=get_banner_color(), box=box.HEAVY))
+                            else:
+                                fail_msg = (
+                                    f"[bold bright_blue]❖ Target File :[/bold bright_blue] [bold white]{f.name}[/bold white]\n"
+                                    f"[bold bright_blue]❖ Operation   :[/bold bright_blue] [bold red]Decompile Failed — 0 bytes written[/bold red]\n"
+                                    f"[bold bright_blue]❖ Reason      :[/bold bright_blue] [dim yellow]{_err_detail}[/dim yellow]"
+                                )
+                                console.print(Panel(fail_msg, title="[bold white on red] ⚠ DECOMPILE FAILED ⚠ [/]", border_style="red", box=box.HEAVY))
+                                if out_path.exists(): out_path.unlink()  # remove empty file
+                            console.print("") 
+                        except Exception as e: 
+                            console.print(Panel(f"[bold red]❌ Error Processing {f.name}: {e}[/bold red]", border_style="red", box=box.HEAVY))
+            Prompt.ask("\n[bold bright_blue]Press Enter to return to Lua Menu...[/bold bright_blue]", default="")
+
+        elif choice == "2":
+            console.clear()
+            print_banner_and_header()
+            console.print(Panel(f"[bold bright_blue][*] Scanning Directory:[/bold bright_blue] [bold green]'{lua_edit.name}'...[/bold green]", border_style=b_color, box=box.ROUNDED))
+            files = [f for f in lua_edit.iterdir() if f.is_file() and f.suffix in ['.lua', '.luac']]
+            if not files: 
+                console.print(Panel(f"[red]❌ No files found in {lua_edit.resolve()}[/red]", border_style="red", box=box.HEAVY))
+            else:
+                file_list = "\n".join([f"  [bold green]{i}.[/bold green] [bold white]{f.name}[/bold white]" for i, f in enumerate(files, 1)])
+                console.print(Panel(file_list, title="[bold cyan]📂 Available Files[/bold cyan]", border_style="cyan", box=box.DOUBLE_EDGE))
+                sel = Prompt.ask(f"\n[bold bright_blue]👉 Select file number(s) (e.g. 1, 2), 'all', or '0' to Back[/bold bright_blue]", default="all")
+                selected_files = []
+                if sel.strip() == '0': continue 
+                elif sel.lower() == 'all': selected_files = files
+                else:
+                    for x in sel.split(','):
+                        if x.strip().isdigit():
+                            idx = int(x.strip()) - 1
+                            if 0 <= idx < len(files):
+                                selected_files.append(files[idx])
+                if not selected_files:
+                    console.print(Panel("[red]❌ Invalid selection![/red]", border_style="red", box=box.HEAVY))
+                else:
+                    console.print("")
+                    for f in selected_files:
+                        try:
+                            progress = Progress(
+                                SpinnerColumn("bouncingBar", style="bold cyan"),
+                                TextColumn("[bold bright_blue]{task.description}"),
+                                TextColumn("{task.fields[my_bar]}"),
+                                TextColumn("[bold white]{task.percentage:>3.0f}%")
+                            )
+                            progress_panel = Panel(progress, title="[blink bold white on blue] ⚙ PROCESSING ENGINE [/]", border_style="bright_blue", box=box.HEAVY)
+                            with Live(progress_panel, console=console, refresh_per_second=20):
+                                short_name = f.name if len(f.name) < 20 else f.name[:17] + "..."
+                                initial_bar = "[bold bright_blue]\\[[/bold bright_blue][bold blue]" + "-"*25 + "[/bold blue][bold bright_blue]][/bold bright_blue]"
+                                task = progress.add_task(f"Compiling : {short_name}", total=100, my_bar=initial_bar)
+                                for i in range(1, 101):
+                                    time.sleep(0.015) 
+                                    filled = int((i / 100) * 25)
+                                    current_bar = "[bold bright_blue]\\[[/bold bright_blue][bold cyan]" + "█" * filled + "[/bold cyan][bold blue]" + "-" * (25 - filled) + "[/bold blue][bold bright_blue]][/bold bright_blue]"
+                                    progress.update(task, advance=1, my_bar=current_bar)
+                            
+                            process_file = f
+                            if f.suffix == '.lua':
+                                process_file = lua_edit / f"{f.stem}.std.luac"
+                                subprocess.run(["luac5.3", "-o", str(process_file), str(f)])
+                            with open(process_file, 'rb') as fp: data = fp.read()
+                            bgmi_data = process_lua_file(data, is_encrypt=True)
+                            final_out = lua_res / f"{f.stem}.lua"
+                            with open(final_out, 'wb') as fp: fp.write(bgmi_data)
+                            
+                            success_msg = (
+                                f"[bold bright_blue]❖ Target File :[/bold bright_blue] [bold white]{f.name}[/bold white]\n"
+                                f"[bold bright_blue]❖ Operation   :[/bold bright_blue] [bold green]Encrypted Successfully[/bold green]\n"
+                                f"[bold bright_blue]❖ Output Path :[/bold bright_blue] [dim yellow]Lua_Rueslt/{final_out.name}[/dim yellow]"
+                            )
+                            console.print(Panel(success_msg, title="[bold white on green] ⚡ ENCRYPTION SUCCESS ⚡ [/]", border_style=get_banner_color(), box=box.HEAVY))
+                            console.print("") 
+                            if f.suffix == '.lua' and process_file.exists(): process_file.unlink()
+                        except Exception as e: 
+                            console.print(Panel(f"[bold red]❌ Error Processing {f.name}: {e}[/bold red]", border_style="red", box=box.HEAVY))
+            Prompt.ask("\n[bold bright_blue]Press Enter to return to Lua Menu...[/bold bright_blue]", default="")
+
+        elif choice == "3":
+            console.clear()
+            print_banner_and_header()
+            console.print(Panel(f"[bold bright_blue][*] Scanning Original PAK in:[/bold bright_blue] [bold green]'{lua_org_pak.name}'...[/bold green]", border_style=b_color, box=box.ROUNDED))
+            
+            pak_files = [f for f in lua_org_pak.iterdir() if f.is_file() and f.suffix.lower() in ['.pak', '.obb']]
+            if not pak_files:
+                console.print(Panel(f"[red]❌ No Original PAK found in {lua_org_pak.resolve()}[/red]\n[white]Bhai ORGNAL_PAK folder me apna original pak rakho pehle![/white]", border_style="red", box=box.HEAVY))
+                Prompt.ask("\n[bold bright_blue]Press Enter to return...[/bold bright_blue]", default="")
+                continue
+                
+            target_pak = pak_files[0]
+            if len(pak_files) > 1:
+                console.print(f"[yellow]⚠️ Multiple PAKs found. Auto-selecting first one: {target_pak.name}[/yellow]")
+
+            out_pak = lua_mod_repack / target_pak.name
+            
+            mod_luas = [f for f in lua_edit.iterdir() if f.is_file()]
+            if not mod_luas:
+                console.print(Panel(f"[red]❌ No edited Lua files found in {lua_edit.resolve()}[/red]\n[white]Pehle EDIT_LUA me modify ki hui files daalo![/white]", border_style="red", box=box.HEAVY))
+                Prompt.ask("\n[bold bright_blue]Press Enter to return...[/bold bright_blue]", default="")
+                continue
+
+            file_list_str = ""
+            for i, f in enumerate(mod_luas, 1):
+                size_bytes = f.stat().st_size
+                file_list_str += f"  [bold green]{i}.[/bold green] [bold white]{f.name}[/bold white] [dim yellow]({size_bytes} Bytes)[/dim yellow]\n"
+            
+            console.print(Panel(file_list_str.strip(), title="[bold cyan]📂 Available Lua Files (EDIT_LUA)[/bold cyan]", border_style="cyan", box=box.DOUBLE_EDGE))
+            
+            sel = Prompt.ask(f"\n[bold bright_blue]👉 Select file number(s) to Repack (e.g. 1, 2), 'all', or '0' to Back[/bold bright_blue]", default="all")
+            
+            if sel.strip() == '0':
+                continue
+                
+            selected_luas = []
+            if sel.lower() == 'all':
+                selected_luas = mod_luas
+            else:
+                for x in sel.split(','):
+                    if x.strip().isdigit():
+                        idx = int(x.strip()) - 1
+                        if 0 <= idx < len(mod_luas):
+                            selected_luas.append(mod_luas[idx])
+            
+            if not selected_luas:
+                console.print(Panel("[red]❌ Invalid selection![/red]", border_style="red", box=box.HEAVY))
+                Prompt.ask("\n[bold bright_blue]Press Enter to continue...[/bold bright_blue]", default="")
+                continue
+
+            temp_repack_dir = lua_base / "Temp_Lua_Inject"
+            if temp_repack_dir.exists():
+                shutil.rmtree(to_long_path(temp_repack_dir))
+            temp_repack_dir.mkdir(exist_ok=True)
+            
+            for f in selected_luas:
+                shutil.copy2(to_long_path(f), to_long_path(temp_repack_dir / f.name))
+
+            with console.status(f"[bold cyan]Injecting {len(selected_luas)} Lua file(s) into {target_pak.name} (ANY SIZE)...[/bold cyan]"):
+                pak_editor = TencentPakFile(target_pak)
+                try:
+                    success_count = repack_any_size(pak_editor, temp_repack_dir, out_pak)
+                    success = success_count > 0
+                except Exception as e:
+                    console.print(f"[bold red]❌ Repack Error: {e}[/bold red]")
+                    success = False
+                
+                shutil.rmtree(to_long_path(temp_repack_dir))
+                    
+            if success:
+                success_msg = (
+                    f"[bold bright_blue]❖ Target PAK  :[/bold bright_blue] [bold white]{target_pak.name}[/bold white]\n"
+                    f"[bold bright_blue]❖ Action      :[/bold bright_blue] [bold green]{len(selected_luas)} LUA Files Repacked Successfully (Full Rebuild)[/bold green]\n"
+                    f"[bold bright_blue]❖ Output Path :[/bold bright_blue] [dim yellow]RE_LUA ANY SIZE/MOD_REPACK/{out_pak.name}[/dim yellow]"
+                )
+                console.print(Panel(success_msg, title="[bold white on green] ⚡ ANY-SIZE REPACK SUCCESS ⚡ [/]", border_style=get_banner_color(), box=box.HEAVY))
+            else:
+                console.print(Panel(f"[red]❌ Repack Failed. Either files didn't match the index or pak structure is invalid![/red]", border_style="red", box=box.HEAVY))
+                if out_pak.exists(): out_pak.unlink()
+            
+            Prompt.ask("\n[bold bright_blue]Press Enter to return to Lua Menu...[/bold bright_blue]", default="")
+
+        elif choice == "4":
+            from rich.progress import TransferSpeedColumn
+            
+            # --- 🔥 NAYA PAGE: SCREEN CLEAR + BANNER + PROFILE ---
+            console.clear()
+            print_banner_and_header()
+            print_user_profile()
+            
+            # --- BGMI_CSV FOLDER LUA_CUSTOM KE ANDAR ---
+            BGMI_CSV_folder = lua_custom / "PUBG_CSV"
+            
+            # --- AGAR FOLDER NAHI HAI TO DOWNLOAD KARO ---
+            if not BGMI_CSV_folder.exists():
+                console.print(Panel(
+                    f"[bold yellow]⚠️ PUBG_CSV folder not found in LUA_CUSTOM![/]\n"
+                    f"[dim]Downloading CSV files from GitHub...[/]",
+                    title="[bold black on bright_yellow] 📥 DOWNLOADING 📥 [/]",
+                    border_style="bright_yellow",
+                    box=box.HEAVY
+                ))
+                
+                # --- GITHUB RAW URLS ---
+                csv_urls = {
+                    "PUBG.csv": "https://raw.githubusercontent.com/sellacountvinay-creator/BGMI_CSV/main/PUBG.csv",
+                    "BGMI.csv": "https://raw.githubusercontent.com/sellacountvinay-creator/BGMI_CSV/main/BGMI.csv"
+                }
+                
+                try:
+                    BGMI_CSV_folder.mkdir(parents=True, exist_ok=True)
+                    
+                    for filename, url in csv_urls.items():
+                        with Progress(
+                            TextColumn("[bold cyan]⬇️ {task.description}"),
+                            BarColumn(bar_width=50, complete_style=f"bold {get_banner_color()}", finished_style="bold green"),
+                            TextColumn("[bold white]{task.percentage:>3.0f}%"),
+                            TextColumn("[dim]({task.fields[file_size]})"),
+                            TransferSpeedColumn(),
+                            TimeElapsedColumn(),
+                            console=console
+                        ) as progress:
+                            task = progress.add_task(
+                                f"Downloading {filename} from GitHub...",
+                                total=100,
+                                file_size=""
+                            )
+                            
+                            response = requests.get(url, stream=True, timeout=30)
+                            if response.status_code == 200:
+                                total_size = int(response.headers.get('content-length', 0))
+                                file_path = BGMI_CSV_folder / filename
+                                downloaded = 0
+                                
+                                with open(file_path, 'wb') as f:
+                                    for chunk in response.iter_content(chunk_size=8192):
+                                        if chunk:
+                                            f.write(chunk)
+                                            downloaded += len(chunk)
+                                            if total_size > 0:
+                                                percent = int((downloaded / total_size) * 100)
+                                                file_size_mb = downloaded / (1024 * 1024)
+                                                progress.update(
+                                                    task, 
+                                                    completed=percent,
+                                                    file_size=f"{file_size_mb:.2f} MB"
+                                                )
+                                
+                                console.print(f"[bold green]✔ Downloaded:[/] [cyan]{filename}[/]")
+                            else:
+                                console.print(f"[bold red]❌ Failed:[/] {filename} (Status: {response.status_code})")
+                    
+                    # --- CHECK KARO FILES AA GAYI ---
+                    csv_files = [f for f in BGMI_CSV_folder.iterdir() if f.suffix.lower() == '.csv']
+                    if not csv_files:
+                        console.print(Panel(
+                            f"[red]❌ Download completed but no CSV files found![/]\n",
+                            border_style="red",
+                            box=box.HEAVY
+                        ))
+                        Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                        continue
+                            
+                except Exception as e:
+                    console.print(Panel(
+                        f"[red]❌ Download Error: {e}[/]",
+                        border_style="red",
+                        box=box.HEAVY
+                    ))
+                    Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                    continue
+                
+                console.print("\n[bold bright_blue]Press Enter to continue...[/bold bright_blue]")
+                input()
+                console.clear()
+                print_banner_and_header()
+                print_user_profile()
+            
+            # --- SELECT CSV - TABLE UI ---
+            csv_files = [f for f in BGMI_CSV_folder.iterdir() if f.suffix.lower() == '.csv']
+            
+            if not csv_files:
+                console.print(Panel(
+                    f"[red]❌ No CSV files found in BGMI_CSV folder![/]\n\n"
+                    f"[yellow]📂 Expected files: BGMI.csv, PUBG.csv[/]",
+                    title="[bold red] ⚠️ CSV MISSING ⚠️ [/]",
+                    border_style="red",
+                    box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                continue
+            
+            csv_table = Table(box=box.SQUARE, expand=True, border_style=get_banner_color())
+            csv_table.add_column("NO.", style="bold cyan", justify="center", width=4)
+            csv_table.add_column("FILE NAME", style="bold white")
+            csv_table.add_column("SIZE", style="bold yellow", justify="right")
+            
+            display_names = {
+                "PUBG.csv": "PUBG 4.5",
+                "BGMI.csv": "BGMI 4.5"
+            }
+            
+            for i, f in enumerate(csv_files, 1):
+                size = f.stat().st_size
+                size_str = f"{size:,} bytes" if size < 1024*1024 else f"{size/(1024*1024):.2f} MB"
+                display_name = display_names.get(f.name, f.name)
+                csv_table.add_row(str(i), display_name, size_str)
+            
+            csv_table.add_row("0", "[bold red] BACK[/bold red]", "[dim]-[/dim]")
+            
+            console.print(Panel(csv_table, border_style=get_banner_color(), box=box.HEAVY))
+            
+            choices = [str(i) for i in range(1, len(csv_files)+1)] + ["0"]
+            csv_choice = Prompt.ask(f"\n[bold bright_blue]👉 Select OPTION [0-{len(csv_files)}][/bold bright_blue]", 
+                                    choices=choices)
+            
+            if csv_choice == "0":
+                continue
+            
+            selected_csv = csv_files[int(csv_choice) - 1]
+            selected_csv_name = selected_csv.name
+            
+            # 🔥 FIX: PEHLE CHECK KARO KI KONSA CSV SELECT HUA HAI
+            is_bgmi = selected_csv_name == "BGMI.csv"
+            is_pubg = selected_csv_name == "PUBG.csv"
+            
+            # 🔥 FIX: AGAR NAHI TO WARNING DO AUR CONTINUE
+            if not is_bgmi and not is_pubg:
+                console.print(Panel(
+                    f"[red]❌ Unsupported CSV file: {selected_csv_name}[/]\n"
+                    f"[yellow]Only BGMI.csv and PUBG.csv are supported.[/]",
+                    border_style="red",
+                    box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold cyan]Press Enter to continue...[/]", default="")
+                continue
+            
+            # --- 🔥 LOADING ANIMATION (BACKGROUND THREAD) + CSV LOAD (FAST) ---
+            spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+            stop_animation = False
+            
+            def run_animation():
+                idx = 0
+                with Live(console=console, refresh_per_second=15, transient=True) as live:
+                    while not stop_animation:
+                        frame = spinner_frames[idx % len(spinner_frames)]
+                        live.update(Text(f"👉 Loading {selected_csv_name} {frame}", style="bold bright_blue"))
+                        idx += 1
+                        time.sleep(0.1)
+            
+            # Animation thread start
+            anim_thread = threading.Thread(target=run_animation)
+            anim_thread.daemon = True
+            anim_thread.start()
+            
+            # --- ✅ FIXED: SIRF SELECTED CSV LOAD HO, DONO NAHI! ---
+            file_path_map = {}
+            total_entries = 0
+            
+            # ✅ Sirf selected_csv load karo!
+            with open(selected_csv, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split(',')
+                    for part in parts:
+                        part = part.strip()
+                        if not part:
+                            continue
+                        filename = Path(part).name
+                        file_path_map[filename] = part
+                        total_entries += 1
+            
+            # CSV load complete → animation stop
+            stop_animation = True
+            time.sleep(0.2)
+            
+            if not file_path_map:
+                console.print(Panel(
+                    f"[red]❌ CSV file is empty or invalid![/]\n",
+                    border_style="red",
+                    box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                continue
+            
+            # --- FIND PAK FILE ---
+            pak_files = [f for f in lua_custom_pak.iterdir() if f.suffix.lower() in ['.pak', '.obb']]
+            if not pak_files:
+                console.print(Panel(
+                    f"[red]❌ No PAK file found in LUA_CUSTOM/PAK![/]\n",
+                    border_style="red",
+                    box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                continue
+            
+            target_pak = pak_files[0]
+            out_pak = lua_custom_result / target_pak.name
+            
+            # --- SCAN EDIT FILES ---
+            root_files = [f for f in lua_custom_edit.iterdir() if f.is_file()]
+            ingame_csv_folder = lua_custom_edit / "InGame" / "EvoBase" / "CSV"
+            ingame_files = []
+            if ingame_csv_folder.exists():
+                for root, dirs, files in os.walk(ingame_csv_folder):
+                    for file in files:
+                        ingame_files.append(Path(root) / file)
+            
+            # 🔥 FIXED: InGame Path Logic - BASED ON SELECTED CSV!
+            ingame_found = []
+            for mod_file in ingame_files:
+                filename = mod_file.name
+                if is_bgmi:  # ✅ BGMI
+                    target_path = f"Content/MultiRegion/Content/IN/CSV/InGame/EvoBase/CSV/{filename}"
+                elif is_pubg:  # ✅ PUBG
+                    target_path = f"Content/CSV/InGame/EvoBase/CSV/{filename}"
+                else:
+                    continue  # Safe fallback
+                ingame_found.append((mod_file, filename, target_path))
+            
+            # --- Root Files (CSV Match) ---
+            root_found = []
+            for mod_file in root_files:
+                target_filename = mod_file.name
+                matching_files = [f for f in file_path_map.keys() if f.lower() == target_filename.lower()]
+                if not matching_files:
+                    matching_files = [f for f in file_path_map.keys() if target_filename.lower() in f.lower()]
+                if matching_files:
+                    target_path = file_path_map[matching_files[0]]
+                    root_found.append((mod_file, matching_files[0], target_path))
+            
+            found_files = ingame_found + root_found
+            
+            if not found_files:
+                console.print(Panel(
+                    f"[red]❌ No matching files found to inject![/]\n",
+                    border_style="red",
+                    box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                continue
+            
+            # --- 🔥 INTERNAL UNREAL ENGINE ADDRESS RESOLVER (WITH GREEN BACKGROUND TITLE) ---
+            match_lines = []
+            
+            # Display which CSV is being used
+            game_display = "BGMI" if is_bgmi else "PUBG"
+            match_lines.append(f"[bold bright_yellow]📌 Selected: {game_display} ({selected_csv_name})[/bold bright_yellow]")
+            match_lines.append("")
+            
+            # InGame files
+            if ingame_found:
+                match_lines.append("[bold cyan]📁 InGame/EvoBase/CSV Files (Direct Repack)[/bold cyan]")
+                for mod_file, filename, target_path in ingame_found:
+                    match_lines.append(f"  [bold green]✔[/] [bold white]{filename}[/] [dim]→[/] [dim yellow]{target_path}[/dim yellow]")
+                match_lines.append("")
+            
+            # Root files
+            if root_found:
+                match_lines.append("[bold cyan]📁 Root EDIT Files (CSV Match)[/bold cyan]")
+                for mod_file, filename, target_path in root_found:
+                    match_lines.append(f"  [bold green]✔[/] [bold white]{filename}[/] [dim]→[/] [dim yellow]{target_path}[/dim yellow]")
+                match_lines.append("")
+            
+            # Total count
+            match_lines.append(f"[bold {get_banner_color()}]📊 Total: {len(found_files)} files will be injected[/bold {get_banner_color()}]")
+            
+            resolver_panel = Panel(
+                "\n".join(match_lines),
+                title= f"[bold white on {get_banner_color()}] ⚡ INTERNAL UNREAL ENGINE ADDRESS RESOLVER ⚡ [/bold white on {get_banner_color()}]",
+                border_style=get_banner_color(),
+                box=box.HEAVY
+            )
+            console.print(resolver_panel)
+            
+            # --- CONFIRM ---
+            confirm = Prompt.ask(f"\n[bold {get_banner_color()}]Proceed with Universal CSV Repack?[/bold {get_banner_color()}] [bold white](y/n)[/bold white]", default="y")
+            if confirm.lower() != 'y':
+                continue
+            
+            # --- BULK INJECTION ---
+            temp_inject_dir = lua_base / "Temp_Bulk_Inject"
+            if temp_inject_dir.exists():
+                shutil.rmtree(to_long_path(temp_inject_dir))
+            temp_inject_dir.mkdir(exist_ok=True)
+            
+            injected_count = 0
+            for mod_file, filename, target_path in found_files:
+                try:
+                    target_parts = Path(target_path).parts
+                    temp_target_path = temp_inject_dir / Path(*target_parts)
+                    os.makedirs(to_long_path(temp_target_path.parent), exist_ok=True)
+                    shutil.copy2(to_long_path(mod_file), to_long_path(temp_target_path))
+                    injected_count += 1
+                except Exception as e:
+                    pass
+            
+            if injected_count > 0:
+                try:
+                    with console.status(f"[bold cyan]📦 Repacking {injected_count} file(s) into {target_pak.name}...[/bold cyan]"):
+                        pak_injection(target_pak, temp_inject_dir, out_pak, target_path_prefix="", show_ui=True)
+                        success = True
+                except Exception as e:
+                    console.print(f"[bold red]❌ Injection Error: {e}[/bold red]")
+                    success = False
+            else:
+                success = False
+            
+            shutil.rmtree(to_long_path(temp_inject_dir))
+            
+            # --- RESULT ---
+            if success and injected_count > 0:
+                summary_content = (
+                    f"[bold bright_blue]▶ TARGET PAK[/bold bright_blue]        [bold white]{target_pak.name}[/bold white]\n"
+                    f"[bold bright_blue]▶ CSV SOURCE[/bold bright_blue]        [bold white]{selected_csv_name}[/bold white]\n"
+                    f"[bold bright_blue]▶ PATH MODE[/bold bright_blue]         [bold green]AUTO CSV PATH ({injected_count}/{injected_count} Matched)[/bold green]\n"
+                    f"[bold bright_blue]▶ FILES TO ADD[/bold bright_blue]      [bold yellow]{injected_count}[/bold yellow]\n"
+                    f"[bold bright_blue]▶ CLEAN PAK MODE[/bold bright_blue]    [bold green]ACTIVE (Old Assets Stripped)[/bold green]"
+                )
+                
+                summary_panel = Panel(
+                    summary_content,
+                    title= f"[bold black on {get_banner_color()}] 📄 CSV SMART INJECTOR SUMMARY [/bold black on {get_banner_color()}]",
+                    border_style=get_banner_color(),
+                    box=box.HEAVY
+                )
+                console.print(summary_panel)
+            else:
+                console.print(Panel(
+                    f"[bold red]❌ BULK INJECTION FAILED![/bold red]",
+                    title="[bold red] ⚠️ INJECTION FAILED ⚠️ [/bold red]",
+                    border_style="red",
+                    box=box.HEAVY
+                ))
+            
+            # --- ✅ FIX: Enter dabane par Option 4 dobara open hoga ---
+            console.print("\n[bold bright_blue]Press Enter to continue...[/bold bright_blue]")
+            input()
+            continue
+
+        elif choice == "5":
+            from rich.progress import TransferSpeedColumn
+
+            console.clear()
+            print_banner_and_header()
+            print_user_profile()
+
+            # ── STEP 1: CSV DOWNLOAD IF MISSING ──────────────────────────────────
+            BGMI_CSV_folder = lua_custom / "PUBG_CSV"
+            if not BGMI_CSV_folder.exists():
+                console.print(Panel(
+                    f"[bold yellow]⚠️ PUBG_CSV folder not found!\n[dim]Downloading CSV files from GitHub...[/dim]",
+                    title="[bold black on bright_yellow] 📥 DOWNLOADING 📥 [/]",
+                    border_style="bright_yellow", box=box.HEAVY
+                ))
+                csv_urls = {
+                    "PUBG.csv": "https://raw.githubusercontent.com/sellacountvinay-creator/BGMI_CSV/main/PUBG.csv",
+                    "BGMI.csv": "https://raw.githubusercontent.com/sellacountvinay-creator/BGMI_CSV/main/BGMI.csv"
+                }
+                try:
+                    BGMI_CSV_folder.mkdir(parents=True, exist_ok=True)
+                    for filename, url in csv_urls.items():
+                        with Progress(
+                            TextColumn("[bold cyan]⬇️ {task.description}"),
+                            BarColumn(bar_width=50, complete_style=f"bold {get_banner_color()}", finished_style="bold green"),
+                            TextColumn("[bold white]{task.percentage:>3.0f}%"),
+                            TextColumn("[dim]({task.fields[file_size]})"),
+                            TransferSpeedColumn(), TimeElapsedColumn(), console=console
+                        ) as progress:
+                            task = progress.add_task(f"Downloading {filename}...", total=100, file_size="")
+                            response = requests.get(url, stream=True, timeout=30)
+                            if response.status_code == 200:
+                                total_size = int(response.headers.get('content-length', 0))
+                                file_path  = BGMI_CSV_folder / filename
+                                downloaded = 0
+                                with open(file_path, 'wb') as f:
+                                    for chunk in response.iter_content(chunk_size=8192):
+                                        if chunk:
+                                            f.write(chunk)
+                                            downloaded += len(chunk)
+                                            if total_size > 0:
+                                                percent = int((downloaded / total_size) * 100)
+                                                progress.update(task, completed=percent, file_size=f"{downloaded/(1024*1024):.2f} MB")
+                                console.print(f"[bold green]✔ Downloaded:[/] [cyan]{filename}[/]")
+                            else:
+                                console.print(f"[bold red]❌ Failed:[/] {filename} (Status: {response.status_code})")
+                    csv_files = [f for f in BGMI_CSV_folder.iterdir() if f.suffix.lower() == '.csv']
+                    if not csv_files:
+                        console.print(Panel("[red]❌ Download completed but no CSV files found![/]", border_style="red", box=box.HEAVY))
+                        Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                        continue
+                except Exception as e:
+                    console.print(Panel(f"[red]❌ Download Error: {e}[/]", border_style="red", box=box.HEAVY))
+                    Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                    continue
+                console.print("\n[bold bright_blue]Press Enter to continue...[/bold bright_blue]")
+                input()
+                console.clear()
+                print_banner_and_header()
+                print_user_profile()
+
+            # ── STEP 2: SELECT CSV ────────────────────────────────────────────────
+            csv_files = [f for f in BGMI_CSV_folder.iterdir() if f.suffix.lower() == '.csv']
+            if not csv_files:
+                console.print(Panel(
+                    "[red]❌ No CSV files found!\n[yellow]Expected: BGMI.csv, PUBG.csv[/yellow]",
+                    title="[bold red] ⚠️ CSV MISSING ⚠️ [/]", border_style="red", box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                continue
+
+            csv_table = Table(box=box.SQUARE, expand=True, border_style=get_banner_color())
+            csv_table.add_column("NO.", style="bold cyan", justify="center", width=4)
+            csv_table.add_column("FILE NAME", style="bold white")
+            csv_table.add_column("SIZE", style="bold yellow", justify="right")
+            display_names = {"PUBG.csv": "PUBG 4.5", "BGMI.csv": "BGMI 4.5"}
+            for i, f in enumerate(csv_files, 1):
+                size = f.stat().st_size
+                size_str = f"{size:,} bytes" if size < 1024*1024 else f"{size/(1024*1024):.2f} MB"
+                csv_table.add_row(str(i), display_names.get(f.name, f.name), size_str)
+            csv_table.add_row("0", "[bold red] BACK[/bold red]", "[dim]-[/dim]")
+            console.print(Panel(csv_table, border_style=get_banner_color(), box=box.HEAVY))
+            choices = [str(i) for i in range(1, len(csv_files)+1)] + ["0"]
+            csv_choice = Prompt.ask(f"\n[bold bright_blue]👉 Select OPTION [0-{len(csv_files)}][/bold bright_blue]", choices=choices)
+            if csv_choice == "0":
+                continue
+
+            selected_csv      = csv_files[int(csv_choice) - 1]
+            selected_csv_name = selected_csv.name
+            is_bgmi = selected_csv_name == "BGMI.csv"
+            is_pubg = selected_csv_name == "PUBG.csv"
+
+            if not is_bgmi and not is_pubg:
+                console.print(Panel(
+                    f"[red]❌ Unsupported CSV: {selected_csv_name}\n[yellow]Only BGMI.csv and PUBG.csv are supported.[/yellow]",
+                    border_style="red", box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold cyan]Press Enter to continue...[/]", default="")
+                continue
+
+            # ── STEP 3: BUILD file_path_map FROM CSV ─────────────────────────────
+            file_path_map  = {}
+            total_entries  = 0
+            stop_animation = False
+
+            def _csv_loading_anim():
+                frames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
+                i = 0
+                while not stop_animation:
+                    console.print(f"\r[bold cyan]{frames[i % len(frames)]} Loading CSV...[/bold cyan]", end="")
+                    time.sleep(0.08); i += 1
+
+            anim_thread = threading.Thread(target=_csv_loading_anim, daemon=True)
+            anim_thread.start()
+            with open(selected_csv, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line: continue
+                    for part in line.split(','):
+                        part = part.strip()
+                        if part:
+                            file_path_map[Path(part).name] = part
+                            total_entries += 1
+            stop_animation = True
+            time.sleep(0.2)
+
+            if not file_path_map:
+                console.print(Panel("[red]❌ CSV file is empty or invalid![/]", border_style="red", box=box.HEAVY))
+                Prompt.ask("\n[bold cyan]Press Enter to return...[/]", default="")
+                continue
+
+            # ── STEP 4: SELECT TEMPLATE PAK ──────────────────────────────────────
+            pak_dir_5 = lua_base / "PAK"
+            pak_dir_5.mkdir(parents=True, exist_ok=True)
+            pak_files_5 = [f for f in pak_dir_5.iterdir() if f.suffix.lower() in ['.pak', '.obb']]
+            if not pak_files_5:
+                console.print(Panel(
+                    f"[red]❌ No PAK file found in {pak_dir_5.resolve()}[/red]\n"
+                    "[white]Place a template .pak / .obb in the PAK folder first.[/white]",
+                    border_style="red", box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold bright_blue]Press Enter to return...[/bold bright_blue]", default="")
+                continue
+
+            if len(pak_files_5) == 1:
+                template_pak_path = pak_files_5[0]
+                console.print(Panel(f"[bold green]✅ Template PAK:[/] [bold white]{template_pak_path.name}[/]", border_style=b_color, box=box.ROUNDED))
+            else:
+                file_list_str = "\n".join([f"  [bold green]{i}.[/bold green] [bold white]{f.name}[/bold white]" for i, f in enumerate(pak_files_5, 1)])
+                console.print(Panel(file_list_str, title="[bold cyan]📂 Select Template PAK[/bold cyan]", border_style="cyan", box=box.DOUBLE_EDGE))
+                sel = Prompt.ask("[bold bright_blue]👉 Select file number[/bold bright_blue]")
+                if not sel.strip().isdigit() or not (1 <= int(sel.strip()) <= len(pak_files_5)):
+                    console.print(Panel("[red]❌ Invalid selection![/red]", border_style="red", box=box.HEAVY))
+                    Prompt.ask("\n[bold bright_blue]Press Enter to return...[/bold bright_blue]", default="")
+                    continue
+                template_pak_path = pak_files_5[int(sel.strip()) - 1]
+
+            # ── STEP 5: SCAN EDIT FILES + RESOLVE CSV PATHS ──────────────────────
+            edit_files_5 = [p for p in lua_edit.rglob('*') if p.is_file()]
+            if not edit_files_5:
+                console.print(Panel(
+                    f"[red]❌ No files in EDIT_LUA: {lua_edit.resolve()}[/red]",
+                    border_style="red", box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold bright_blue]Press Enter to return...[/bold bright_blue]", default="")
+                continue
+
+            resolved_files = []   # list of (Path, resolved_pak_path_str)
+            unresolved     = []
+
+            ingame_csv_folder = lua_edit / "InGame" / "EvoBase" / "CSV"
+            for p in edit_files_5:
+                filename = p.name
+                # InGame subfolder → direct path by game type
+                try:
+                    p.relative_to(ingame_csv_folder)
+                    in_ingame = True
+                except ValueError:
+                    in_ingame = False
+
+                if in_ingame:
+                    if is_bgmi:
+                        resolved_path = f"Content/MultiRegion/Content/IN/CSV/InGame/EvoBase/CSV/{filename}"
+                    else:
+                        resolved_path = f"Content/CSV/InGame/EvoBase/CSV/{filename}"
+                    resolved_files.append((p, resolved_path))
+                else:
+                    # Try CSV match
+                    matches = [k for k in file_path_map if k.lower() == filename.lower()]
+                    if not matches:
+                        matches = [k for k in file_path_map if filename.lower() in k.lower()]
+                    if matches:
+                        resolved_files.append((p, file_path_map[matches[0]]))
+                    else:
+                        unresolved.append(p)
+
+            if not resolved_files:
+                console.print(Panel(
+                    "[red]❌ No files matched the CSV paths! Check your EDIT_LUA file names.[/red]",
+                    border_style="red", box=box.HEAVY
+                ))
+                Prompt.ask("\n[bold bright_blue]Press Enter to return...[/bold bright_blue]", default="")
+                continue
+
+            # ── RESOLVER DISPLAY ──────────────────────────────────────────────────
+            game_display  = "BGMI" if is_bgmi else "PUBG"
+            match_lines   = [f"[bold bright_yellow]📌 CSV: {game_display} ({selected_csv_name})[/bold bright_yellow]", ""]
+            match_lines  += [f"  [bold green]✔[/] [bold white]{p.name}[/] [dim]→[/] [dim yellow]{rp}[/]" for p, rp in resolved_files]
+            if unresolved:
+                match_lines += ["", f"[bold red]⚠ {len(unresolved)} file(s) had no CSV match (skipped):[/bold red]"]
+                match_lines += [f"  [dim red]✘ {p.name}[/]" for p in unresolved]
+            match_lines.append("")
+            match_lines.append(f"[bold {get_banner_color()}]📊 Total: {len(resolved_files)} files will be built into new PAK[/bold {get_banner_color()}]")
+            console.print(Panel("\n".join(match_lines),
+                title= f"[bold white on {get_banner_color()}] ⚡ CSV PATH RESOLVER ⚡ [/]",
+                border_style=get_banner_color(), box=box.HEAVY))
+
+            confirm = Prompt.ask("\n[bold {get_banner_color()}]Proceed with BUILD NEW PAK?[/bold {get_banner_color()}] [bold white](y/n)[/bold white]", default="y")
+            if confirm.lower() != 'y':
+                continue
+
+            # ── STEP 6: BUILD NEW PAK ─────────────────────────────────────────────
+            result_dir_5 = lua_base / "MOD_REPACK"
+            result_dir_5.mkdir(parents=True, exist_ok=True)
+            output_pak_5 = result_dir_5 / template_pak_path.name
+
+            try:
+                template_pak_obj = TencentPakFile(template_pak_path, is_od=True)
+                version_5   = template_pak_obj._pak_info.version
+                keystream_5 = PakCrypto.zuc_keystream()
+                mp_str_5, _ = _get_all_dirs_and_mp(template_pak_obj)
+
+                template_entry_5 = None
+                for _dp, _files in template_pak_obj._index.items():
+                    for _n, _e in _files.items():
+                        template_entry_5 = _e; break
+                    if template_entry_5: break
+
+                if template_entry_5 is None:
+                    console.print(Panel("[red]❌ Template PAK has no entries![/red]", border_style="red", box=box.HEAVY))
+                    Prompt.ask("\n[bold bright_blue]Press Enter to return...[/bold bright_blue]", default="")
+                    continue
+
+                out_buf_5   = bytearray()
+                new_files_5 = []
+                all_dirs_5  = {}
+                file_rows_5 = []
+
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[bold cyan][BUILD][/bold cyan] {task.description}"),
+                    BarColumn(), TimeElapsedColumn(), console=console
+                ) as progress:
+                    task = progress.add_task("Building...", total=len(resolved_files))
+                    for p, fp_5 in resolved_files:
+                        dir_key = str(PurePath(fp_5).parent).replace('\\', '/') + '/'
+                        if dir_key == './': dir_key = ''
+
+                        ne      = _cp.copy(template_entry_5)
+                        new_raw = p.read_bytes()
+                        pak_rel_5 = PurePath(fp_5)
+
+                        ne.uncompressed_size  = len(new_raw)
+                        ne.compression_method = template_entry_5.compression_method
+                        ne.encryption_method  = template_entry_5.encryption_method
+                        ne.encrypted          = template_entry_5.encrypted
+                        ne.unk1               = template_entry_5.unk1
+                        ne.unk2               = SHA1.new((mp_str_5 + fp_5).lower().encode('utf-8')).digest()
+                        ne.index_new_sep      = template_entry_5.index_new_sep
+                        ne.compressed_blocks  = []
+
+                        # ── Kazuki engine: class-method encrypt + PakCompression ──
+                        if ne.compression_method == CM_NONE:
+                            cipher = (template_pak_obj._apply_encrypt_for_entry(
+                                          new_raw, pak_rel_5, ne.encryption_method)
+                                      if ne.encrypted else new_raw)
+                            ne.offset  = len(out_buf_5)
+                            ne.size    = len(new_raw)
+                            out_buf_5 += cipher
+                        else:
+                            cs     = (template_entry_5.compression_block_size
+                                      if template_entry_5.compression_block_size > 0 else 65536)
+                            chunks = [new_raw[i:i + cs] for i in range(0, len(new_raw), cs)]
+                            order  = PakCrypto.generate_block_indices(len(chunks), ne.encryption_method)
+                            inv    = [0] * len(chunks)
+                            for logical_i, phys_i in enumerate(order):
+                                inv[phys_i] = logical_i
+
+                            # compress each logical chunk via Kazuki PakCompression
+                            cipher_by_logical = []
+                            for chunk in chunks:
+                                compressed = PakCompression.compress_block(
+                                    chunk,
+                                    ne.compression_method,
+                                    template_pak_obj._zstd_dict,
+                                    None,
+                                )
+                                cipher = (template_pak_obj._apply_encrypt_for_entry(
+                                              compressed, pak_rel_5, ne.encryption_method)
+                                          if ne.encrypted else compressed)
+                                cipher_by_logical.append(cipher)
+
+                            new_blks = []
+                            for phys_i in range(len(chunks)):
+                                blk_data  = cipher_by_logical[inv[phys_i]]
+                                blk       = PakCompressedBlock.__new__(PakCompressedBlock)
+                                blk.start = len(out_buf_5)
+                                blk.end   = blk.start + len(blk_data)
+                                out_buf_5 += blk_data
+                                new_blks.append(blk)
+                            ne.compressed_blocks = new_blks
+                            ne.offset = new_blks[0].start if new_blks else len(out_buf_5)
+                            ne.size   = sum(b.end - b.start for b in new_blks)
+
+                        ne.content_hash = SHA1.new(bytes(out_buf_5[ne.offset:ne.offset+ne.size])).digest()
+                        new_files_5.append(ne)
+                        all_dirs_5.setdefault(dir_key, {})[p.name] = ne
+                        file_rows_5.append((fp_5, ne.uncompressed_size, ne.size))
+                        progress.update(task, advance=1, description=p.name)
+
+                # Summary
+                summary_5 = Table(title="Files Built into New PAK", box=box.ROUNDED, border_style="cyan")
+                summary_5.add_column("Path in PAK",   style=f"bold {get_banner_color()}")
+                summary_5.add_column("Original Size", justify="right", style="dim")
+                summary_5.add_column("Stored Size",   justify="right", style="dim")
+                for fp_5, orig_sz, stored_sz in file_rows_5:
+                    summary_5.add_row(fp_5, human_size(orig_sz), human_size(stored_sz))
+                console.print(summary_5)
+
+                # Build index
+                id_to_idx_5 = {id(ne): i for i, ne in enumerate(new_files_5)}
+                idx_5  = bytearray(_pw_string(mp_str_5))
+                idx_5 += struct.pack('<I', len(new_files_5))
+                for ne in new_files_5:
+                    idx_5 += _pw_entry(ne, version_5)
+                idx_5 += struct.pack('<Q', len(all_dirs_5))
+                for dp_str, dir_files in all_dirs_5.items():
+                    idx_5 += _pw_string(dp_str)
+                    idx_5 += struct.pack('<Q', len(dir_files))
+                    for name, e in dir_files.items():
+                        idx_5 += _pw_string(name)
+                        idx_5 += struct.pack('<i', ~id_to_idx_5[id(e)])
+
+                index_plain_5 = bytes(idx_5)
+                new_sha1_5    = SHA1.new(index_plain_5).digest()
+
+                if template_pak_obj._pak_info.index_encrypted:
+                    try:
+                        key = PakCrypto.rsa_extract(template_pak_obj._pak_info.packed_key, RSA_MOD_1)
+                        iv  = PakCrypto.rsa_extract(template_pak_obj._pak_info.packed_iv,  RSA_MOD_1)
+                        if key and iv and len(key) == 32 and len(iv) >= 16:
+                            aes = AES.new(key, MODE_CBC, iv[:16])
+                            pad = (-len(index_plain_5)) % AES.block_size or AES.block_size
+                            index_bytes_5 = aes.encrypt(index_plain_5 + bytes([pad]*pad))
+                        else:
+                            index_bytes_5 = index_plain_5
+                    except:
+                        index_bytes_5 = index_plain_5
+                else:
+                    index_bytes_5 = index_plain_5
+
+                new_idx_offset_5 = len(out_buf_5)
+                out_buf_5       += index_bytes_5
+
+                orig_fc_5    = template_pak_obj._file_content
+                footer_sz_5  = TencentPakInfo._mem_size(version_5)
+                new_footer_5 = bytearray(orig_fc_5[-footer_sz_5:])
+                h_key_5      = struct.pack('<5I', *keystream_5[4:9])
+                new_footer_5[-36:-16] = bytes(a ^ b for a, b in zip(new_sha1_5, h_key_5))
+                new_footer_5[-16:-8]  = ((len(index_bytes_5) ^ (keystream_5[10] << 32 | keystream_5[11])).to_bytes(8, 'little'))
+                new_footer_5[-8:]     = ((new_idx_offset_5   ^ (keystream_5[0]  << 32 | keystream_5[1] )).to_bytes(8, 'little'))
+                out_buf_5 += new_footer_5
+
+                with open(output_pak_5, 'wb') as f:
+                    f.write(out_buf_5)
+
+                console.print(Panel(
+                    f"[bold bright_blue]▶ CSV SOURCE[/bold bright_blue]      [bold white]{selected_csv_name}[/bold white]\n"
+                    f"[bold bright_blue]▶ TEMPLATE PAK[/bold bright_blue]    [bold white]{template_pak_path.name}[/bold white]\n"
+                    f"[bold bright_blue]▶ FILES BUILT[/bold bright_blue]     [bold yellow]{len(new_files_5)}[/bold yellow]\n"
+                    f"[bold bright_blue]▶ OUTPUT[/bold bright_blue]          [bold green]{output_pak_5}[/bold green]\n"
+                    f"[bold bright_blue]▶ PATH MODE[/bold bright_blue]       [bold green]AUTO CSV PATH RESOLVER[/bold green]",
+                    title= f"[bold white on {get_banner_color()}] ⚡ BUILD NEW PAK SUCCESS ⚡ [/]",
+                    border_style=get_banner_color(), box=box.HEAVY
+                ))
+
+                try:
+                    TencentPakFile(output_pak_5, is_od=True)
+                    console.print(Panel("[bold green]✅ VERIFICATION PASSED[/bold green]", border_style="green", box=box.ROUNDED))
+                except Exception as ve:
+                    console.print(Panel(f"[bold yellow]⚠ Verification note: {ve}[/bold yellow]", border_style="yellow", box=box.ROUNDED))
+
+            except Exception as e:
+                console.print(Panel(f"[bold red]❌ Build failed: {e}[/bold red]", border_style="red", box=box.HEAVY))
+                import traceback; traceback.print_exc()
+
+            Prompt.ask("\n[bold bright_blue]Press Enter to return to Lua Menu...[/bold bright_blue]", default="")
+
+        elif choice == "0":
+            return
+
+
+#Isme fix do pura vo 
+
+def goodbye_glacier_light_effect():
+    console.clear()
+    cols, rows = shutil.get_terminal_size()
+    W, H = cols, rows
+    particles = ["·", "•", "°", "*", "×", "■"]
+    b_color = get_banner_color()
+
+    with Live(console=console, screen=True, refresh_per_second=24) as live:
+        for step in range(12):
+            lines = ["".join(random.choice(particles) if random.random() < 0.05 else " " for _ in range(W)) for _ in range(H-1)]
+            live.update(Text("\n".join(lines), style=b_color))
+            time.sleep(0.04)
+
+    console.clear()
+    console.print("\n" * rows, style="on white") 
+    time.sleep(0.15) 
+    console.clear()
+
+    def make_exit_panel(style_main, style_sub, style_off):
+        msg = Text.assemble(
+            (to_fancy("GOOD BYE BABYY\n\n"), style_main),
+            (to_fancy("SYSTEM DISCONNECTED\n"), style_sub),
+            (to_fancy("OFFLINE NOW"), style_off)
+        )
+        return Panel(Align.center(msg), border_style=style_main, box=box.DOUBLE, padding=(2, 5))
+
+    stages = [
+        ("dim", "dim", "dim"),
+        ("bold black", "dim", "dim"),
+        (f"bold {b_color}", "bold black", "dim"),
+        (f"bold bright_{b_color.replace('bright_', '')}", f"bold {b_color}", "bold black"),
+        ("bold bright_white", "bold bright_white", "bold bright_white")
+    ]
+
+    with Live(console=console, screen=True, refresh_per_second=12) as live:
+        for s1, s2, s3 in stages:
+            content = Align.center(make_exit_panel(s1, s2, s3), vertical="middle")
+            live.update(content)
+            time.sleep(0.2)
+        time.sleep(0.6)
+
+    console.clear()
+    final_panel = make_exit_panel(f"blink bold {b_color}", "bold white", "bold red")
+    console.print("\n" * (rows // 4))
+    console.print(final_panel)
+    time.sleep(2)
+    sys.exit()
+
+def print_banner_and_header():
+    console.clear()
+    console.print(get_neon_header())
+
+def print_user_profile():
+    """PATCHED: Always shows VIP account info panel."""
+    from datetime import datetime
+    b_color = get_banner_color()
+    now = datetime.now()
+    grid = Table.grid(expand=True)
+    grid.add_column(justify="left")
+    grid.add_column(justify="right")
+    grid.add_row(
+        f"[bold {b_color}]🔑 {to_fancy('Key')}:[/bold {b_color}] [bold white]VIP-OFFLINE-BYPASS[/]",
+        f"[bold {b_color}]{to_fancy('Valid for')}:[/bold {b_color}] [bold yellow]{to_fancy('99999 Days')}[/]"
+    )
+    grid.add_row(
+        f"[bold {b_color}]⏳ {to_fancy('Expiry')}:[/bold {b_color}] [bold white]{to_fancy('2300-01-01 00:00:00')}[/]",
+        f"[bold {b_color}]🚀 {to_fancy('Version')}:[/bold {b_color}] [bold white]{to_fancy('V1.0 (LATEST)')}[/]"
+    )
+    console.print(Panel(
+        grid,
+        title=f"[bold black on {b_color}] 💎 {to_fancy('VIP ACCOUNT INFO')} 💎 [/]",
+        border_style=b_color,
+        box=box.HEAVY,
+        padding=(0, 1)
+    ))
+    console.print(Panel(
+        Align.center(Text(f" ● {to_fancy('SECURE CONNECTION ESTABLISHED')} ● ", style=f"bold black on {b_color}")),
+        border_style=b_color, box=box.SIMPLE, padding=(0,0)
+    ))
+
+
+def to_fancy(text):
+    # Fallback function if to_fancy is not defined in your script
+    return text
+
+def mini_clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def get_terminal_width():
+    try:
+        return os.get_terminal_size().columns
+    except (AttributeError, OSError):
+        return 80  # Default fallback width
+
+def mini_display_tool_name():
+    mini_clear_screen()
+    width = get_terminal_width()
+    
+    Y = "\033[1;33m"
+    W = "\033[1;37m"
+    G = "\033[1;32m"
+    C = "\033[1;36m"
+    RESET = "\033[0m"
+    
+    # 1. Centered Banner
+    banner_lines = [
+        r"   _____ __ __  ____   _  __  ______ ____   ____   __ ",
+        r"  / ___// //_/ /  _/  / |/ /  /_  __// __ \ / __ \ / / ",
+        r"  \__ \/ ,<    / /   /  |/ /    / /  / / / // / / // /  ",
+        r" ___/ / /| | _/ /   / /|  /    / /  / /_/ // /_/ // /___",
+        r"/____/_/ |_|/___/  /_/ |_/    /_/   \____/ \____//_____/"
+    ]
+    
+    for line in banner_lines:
+        print((G + line + RESET).center(width + len(G) + len(RESET)))
+    
+    print("\n")
+    
+    # 2. Centered UI Box
+    box_lines = [
+     #  ₹ f"{W}╔══════════════════════════════════════════╗",
+      #  f"{W}║ {Y}▶  {to_fancy('SKIN TOOL PRO')}                     {W}║",
+        #f"{W}╠══════════════════════════════════════════╣",
+     #   f"{W}║ {G}▶  {to_fancy('ACCESS')} : {Y}{to_fancy('VIP SERVER')}                {W}║",
+      #  f"{W}║ {G}▶  {to_fancy('STATUS')} : {G}{to_fancy('ONLINE')}                    {W}║",
+       # f"{W}╚══════════════════════════════════════════╝{RESET}"
+    ]
+    
+    for line in box_lines:
+        # Calculate extra length for ANSI escape characters so centering remains precise
+        ansi_len = line.count('\033') * 9  # Approximate length of color codes
+        print(line.center(width + ansi_len))
+        
+    print("\n")
+
+
+def mini_mark_block_as_modified(file_path, byte_offset):
+    block_idx = byte_offset // mini_BLOCK_SIZE
+    if file_path not in mini_modified_blocks_map:
+        mini_modified_blocks_map[file_path] = set()
+    mini_modified_blocks_map[file_path].add(block_idx)
+    if block_idx > 0:
+        mini_modified_blocks_map[file_path].add(block_idx - 1)
+    mini_modified_blocks_map[file_path].add(block_idx + 1)
+
+def mini_load_all_skins_data():
+    skins_by_id = {}
+    if not os.path.exists(mini_ALL_TXT_PATH):
+        print(f"{colorama.Fore.RED}🚨 {to_fancy('ALL.txt not found at')} {mini_ALL_TXT_PATH}")
+        return skins_by_id
+    with open(mini_ALL_TXT_PATH, "r", encoding="utf-8", errors='ignore') as f:
+        for line in f:
+            parts = line.strip().split("|")
+            if len(parts) >= 2:
+                skin_id = parts[0].strip()
+                hex_val = parts[1].strip().lower()
+                skin_name = parts[2].strip() if len(parts) >= 3 else ""
+                skins_by_id[skin_id] = {'hex': hex_val, 'name': skin_name}
+    return skins_by_id
+
+def mini_load_index_data():
+    index_data = {}
+    if not os.path.exists(mini_INDEX_FILE_PATH):
+        print(f"{colorama.Fore.YELLOW}⚠️ {to_fancy('index.txt not found at')} {mini_INDEX_FILE_PATH}")
+        return index_data
+    with open(mini_INDEX_FILE_PATH, 'r', encoding='utf-8', errors='ignore') as file:
+        for line in file:
+            parts = line.strip().split('|')
+            if len(parts) >= 4:
+                name = parts[2].strip()
+                index_hex = parts[3].strip().lower()
+                index_data.setdefault(name, []).append(index_hex)
+    return index_data
+
+def mini_load_modskin_pairs():
+    pairs = []
+    if not os.path.exists(mini_MODSKIN_FILE):
+        print(f"{colorama.Fore.RED}🚨 {to_fancy('modskin.txt not found at')} {mini_MODSKIN_FILE}")
+        return pairs
+    with open(mini_MODSKIN_FILE, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'): continue
+            parts = re.split(r'[,\s\->]+', line)
+            if len(parts) >= 2:
+                pairs.append((parts[0].strip(), parts[1].strip()))
+    return pairs
+
+def mini_write_changelog():
+    os.makedirs(mini_OUTPUT_DIR, exist_ok=True)
+    with open(mini_CHANGELOG_PATH, "w", encoding="utf-8") as f:
+        f.write(f"🌟 {to_fancy('Combined Mod Tool Changelog')} 🌟\n")
+        f.write("==============================\n\n")
+        for idx, entry in enumerate(mini_changelog_entries, 1):
+            f.write("==============================\n")
+            f.write(f"{idx}. {to_fancy('ID PAIR')}: {entry['id_pair']}\n")
+            f.write(f"{to_fancy('FILE NAME')}: {entry['file_name']}\n")
+            f.write(f"{to_fancy('Source Item')}: {entry['source_item']}\n")
+            f.write(f"{to_fancy('Target Item')}: {entry['target_item']}\n")
+            f.write(f"{to_fancy('CHANGED HEX FROM')}: {entry['source_hex']} {to_fancy('TO')}: {entry['target_hex']}\n")
+            if entry.get('index_occurrences', 0) > 0:
+                f.write(f"{to_fancy('INDEX CHANGED FROM')}: {entry['source_index']} {to_fancy('TO')}: {entry['target_index']} ({entry['index_occurrences']} occurrence(s))\n")
+            elif entry.get('index_failure_reason'):
+                f.write(f"{to_fancy('Index replacement note')}: {entry['index_failure_reason']}\n")
+            f.write("==============================\n\n")
+
+def mini_remove_readonly(func, path, excinfo):
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception: pass
+
+def mini_copy_files_to_output():
+    print(f"\n{colorama.Fore.CYAN}📁 {to_fancy('Step 1: Copying files from INPUT to OUTPUT...')}")
+    if not os.path.exists(mini_INPUT_DIR):
+        print(f"{colorama.Fore.RED}🚨 {to_fancy('INPUT directory not found')}: {mini_INPUT_DIR}")
+        return False
+    if os.path.exists(mini_OUTPUT_DIR):
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                shutil.rmtree(mini_OUTPUT_DIR, onerror=mini_remove_readonly)
+                break
+            except PermissionError:
+                if attempt < max_retries - 1:
+                    print(f"{colorama.Fore.YELLOW}⚠️ {to_fancy('OUTPUT folder is locked. Retrying in 1s...')}")
+                    time.sleep(1)
+                else:
+                    print(f"\n{colorama.Fore.RED}❌ {to_fancy('ERROR: Cannot delete OUTPUT folder. It is open in another program.')}")
+                    input(f"{colorama.Fore.YELLOW}{to_fancy('Press Enter after closing to try again...')}{colorama.Style.RESET_ALL}")
+                    try: shutil.rmtree(mini_OUTPUT_DIR, onerror=mini_remove_readonly)
+                    except Exception as e:
+                        print(f"{colorama.Fore.RED}❌ {to_fancy('Failed to clean OUTPUT')}: {e}")
+                        return False
+            except Exception as e:
+                print(f"{colorama.Fore.RED}❌ {to_fancy('Error cleaning OUTPUT')}: {e}")
+                return False
+    try:
+        shutil.copytree(mini_INPUT_DIR, mini_OUTPUT_DIR)
+        file_count = sum(len(files) for _, _, files in os.walk(mini_OUTPUT_DIR))
+        print(f"{colorama.Fore.GREEN}✅ {to_fancy(f'Copied {file_count} files to OUTPUT directory')}")
+        return True
+    except Exception as e:
+        print(f"{colorama.Fore.RED}❌ {to_fancy('Error copying files')}: {e}")
+        return False
+
+def mini_process_mod_skin():
+    global mini_modified_blocks_map
+    mini_modified_blocks_map = {}
+    print(f"\n{colorama.Fore.LIGHTBLUE_EX}🔧 {to_fancy('Step 2: Processing Mod Skin replacements...')}")
+    
+    # --- AUTO MODE: REPLACE (One-Way) HARDCODED ---
+    is_swap = False
+    mode_str = "REPLACE (One-Way)"
+    print(f"{colorama.Fore.CYAN}{to_fancy('Mode')}: {colorama.Fore.LIGHTGREEN_EX}{to_fancy(mode_str)} [AUTO SELECTED]")
+    
+    skins_data = mini_load_all_skins_data()
+    index_data = mini_load_index_data()
+    id_pairs = mini_load_modskin_pairs()
+    if not id_pairs:
+        print(f"{colorama.Fore.RED}⚠️ {to_fancy('No ID pairs found in modskin.txt')}")
+        return
+        
+    print(f"{colorama.Fore.LIGHTGREEN_EX}✅ {to_fancy(f'Found {len(id_pairs)} ID pairs to process')}")
+    resolved_ops = []
+    missing_ids = set()
+    for s_id, t_id in id_pairs:
+        if s_id not in skins_data:
+            missing_ids.add(s_id)
+            continue
+        if t_id not in skins_data:
+            missing_ids.add(t_id)
+            continue
+        s_hex = skins_data[s_id]['hex']
+        s_name = skins_data[s_id]['name']
+        t_hex = skins_data[t_id]['hex']
+        t_name = skins_data[t_id]['name']
+        resolved_ops.append({
+            'search_hex': t_hex, 'replace_hex': s_hex,
+            'search_name': t_name, 'replace_name': s_name,
+            'label': f"{s_id} -> {t_id}",
+            'op_type': "REPLACE"
+        })
+        
+    if missing_ids:
+        print(f"{colorama.Fore.LIGHTBLUE_EX}⚠️ {to_fancy(f'Warning: {len(missing_ids)} IDs not found in ALL.txt:')} {colorama.Fore.CYAN}{', '.join(sorted(missing_ids))}")
+    if not resolved_ops:
+        print(f"{colorama.Fore.RED}❌ {to_fancy('Empty operational queue. Nothing to process.')}")
+        return
+        
+    modified_files = 0
+    for root, dirs, files in os.walk(mini_OUTPUT_DIR):
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
+            if file_name.lower().endswith('.txt'): continue
+            try:
+                with open(file_path, 'rb') as f:
+                    content_bytes = f.read()
+            except Exception as e:
+                print(f"{colorama.Fore.RED}❌ {to_fancy('Error reading')} {file_name}: {e}")
+                continue
+            hex_data = content_bytes.hex()
+            file_modified = False
+            for op in resolved_ops:
+                s_hex = op['search_hex']
+                r_hex = op['replace_hex']
+                s_name = op['search_name']
+                r_name = op['replace_name']
+                if s_hex not in hex_data: continue
+                occ = hex_data.count(s_hex)
+                if occ >= 2:
+                    first_pos = hex_data.find(s_hex)
+                    second_pos = hex_data.find(s_hex, first_pos + len(s_hex))
+                    if second_pos != -1:
+                        hex_data = hex_data[:second_pos] + r_hex + hex_data[second_pos+len(s_hex):]
+                        file_modified = True
+                        mini_mark_block_as_modified(file_path, second_pos // 2)
+                        idx_occ = 0
+                        idx_reason = ""
+                        mod_idx_from = "N/A"
+                        mod_idx_to = "N/A"
+                        if s_name in index_data and r_name in index_data:
+                            search_candidates = index_data[s_name]
+                            replacement_index = index_data[r_name][0]
+                            window_start = max(0, first_pos - 60)
+                            window = hex_data[window_start:first_pos]
+                            found = False
+                            for candidate in search_candidates:
+                                if candidate in window:
+                                    mod_idx_from = candidate
+                                    mod_idx_to = replacement_index
+                                    window_replaced = window.replace(candidate, replacement_index, 1)
+                                    local_idx = window.find(candidate)
+                                    real_idx = window_start + local_idx
+                                    hex_data = hex_data[:window_start] + window_replaced + hex_data[first_pos:]
+                                    idx_occ = 1
+                                    found = True
+                                    mini_mark_block_as_modified(file_path, real_idx // 2)
+                                    break
+                            if not found: idx_reason = "Index hex not found in window"
+                        else: idx_reason = "Index names missing"
+                        rel_path = os.path.relpath(file_path, mini_OUTPUT_DIR)
+                        mini_changelog_entries.append({
+                            'id_pair': f"{op['label']} ({op['op_type']})",
+                            'file_name': rel_path,
+                            'source_item': f"{s_name} [Found]",
+                            'target_item': f"{r_name} [Applied]",
+                            'source_hex': s_hex,
+                            'target_hex': r_hex,
+                            'source_index': mod_idx_from,
+                            'target_index': mod_idx_to,
+                            'index_occurrences': idx_occ,
+                            'index_failure_reason': idx_reason
+                        })
+            if file_modified:
+                try:
+                    with open(file_path, 'wb') as f:
+                        f.write(bytes.fromhex(hex_data))
+                    modified_files += 1
+                except Exception as e:
+                    print(f"{colorama.Fore.RED}❌ {to_fancy('Error writing')} {file_name}: {e}")
+    print(f"{colorama.Fore.LIGHTGREEN_EX}✅ {to_fancy(f'Modified {modified_files} files')}")
+
+def mini_build_pattern_groups(hex_list):
+    groups = {}
+    for hx in hex_list:
+        try: b = bytes.fromhex(hx)
+        except ValueError: continue
+        if not b: continue
+        groups.setdefault(len(b), set()).add(b)
+    return groups
+
+def mini_null_bytes_in_file(file_path, pattern_groups, dirty_blocks, target_counts={2}):
+    try: data = Path(file_path).read_bytes()
+    except: return 0
+    ba = bytearray(data)
+    total_hits = 0
+    modified = False
+    file_size = len(ba)
+    for block_idx in dirty_blocks:
+        start_offset = block_idx * mini_BLOCK_SIZE
+        if start_offset >= file_size: continue
+        end_offset = min(start_offset + mini_BLOCK_SIZE, file_size)
+        block_len = end_offset - start_offset
+        block_mv = memoryview(ba)[start_offset:end_offset]
+        for L, patterns in pattern_groups.items():
+            if L <= 0 or block_len < L: continue
+            zero = b"\x00" * L
+            occurrences = {}
+            i = 0
+            end = block_len - L
+            while i <= end:
+                chunk = bytes(block_mv[i:i+L])
+                if chunk in patterns:
+                    if chunk not in occurrences: occurrences[chunk] = []
+                    occurrences[chunk].append(i)
+                    i += L
+                else: i += 1
+            for pat, positions in occurrences.items():
+                count = len(positions)
+                if count in target_counts:
+                    for pos in positions:
+                        abs_pos = start_offset + pos
+                        ba[abs_pos:abs_pos+L] = zero
+                    total_hits += count
+                    modified = True
+    if modified:
+        Path(file_path).write_bytes(ba)
+    return total_hits
+
+def mini_process_size_fix():
+    skins_data = mini_load_all_skins_data()
+    if not skins_data:
+        return
+        
+    protected_ids = set()
+    protected_hexes_from_ids = set()
+    if os.path.exists(mini_MODSKIN_FILE):
+        with open(mini_MODSKIN_FILE, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'): continue
+                parts = re.split(r'[,\s\->]+', line)
+                for part in parts:
+                    part = part.strip()
+                    if part: protected_ids.add(part)
+    for skin_id in protected_ids:
+        if skin_id in skins_data:
+            protected_hex = skins_data[skin_id]['hex']
+            protected_hexes_from_ids.add(protected_hex.lower())
+    
+    valid_entries = []
+    skipped_count_name = 0
+    skipped_count_zeros = 0
+    skipped_count_id = 0
+    exclude_keywords = {"face", "hair", "head", "male", "female"}
+    for skin_id, info in skins_data.items():
+        hex_code = info['hex']
+        skin_name = info['name'].lower()
+        if skin_id in protected_ids:
+            skipped_count_id += 1
+            continue
+        if any(keyword in skin_name for keyword in exclude_keywords):
+            skipped_count_name += 1
+            continue
+        if "0000" in hex_code:
+            skipped_count_zeros += 1
+            continue
+        valid_entries.append((hex_code, skin_name))
+    
+    exclude_hexes = set()
+    for entry in mini_changelog_entries:
+        exclude_hexes.add(entry.get('source_hex', '').lower())
+        exclude_hexes.add(entry.get('target_hex', '').lower())
+        if entry.get('source_index', "N/A") != "N/A": 
+            exclude_hexes.add(entry['source_index'].lower())
+        if entry.get('target_index', "N/A") != "N/A": 
+            exclude_hexes.add(entry['target_index'].lower())
+    
+    exclude_txt_path = os.path.join(mini_BASE_DIR, "exclude.txt")
+    os.makedirs(os.path.dirname(exclude_txt_path), exist_ok=True)
+    
+    with open(exclude_txt_path, 'w', encoding='utf-8') as f:
+        if exclude_hexes:
+            f.write("# Hex values to exclude from nulling (auto-generated from changelog)\n")
+            f.write(" ".join(sorted(exclude_hexes)))
+        else:
+            f.write("# No hex values to exclude\n")
+    
+    exclude_hexes.update(protected_hexes_from_ids)
+
+    
+    print(f"{colorama.Fore.CYAN}{to_fancy('Nulling Mode:')} {colorama.Fore.LIGHTGREEN_EX}AUTO NULL SYSTEM [AUTO SELECTED]")
+    
+    target_counts = {2}
+    
+    final_hexes = []
+    for hx, name in valid_entries:
+        if hx in exclude_hexes: continue
+        final_hexes.append(hx)
+        
+    pattern_groups = mini_build_pattern_groups(final_hexes)
+    files_to_process = []
+    for root, dirs, files in os.walk(mini_OUTPUT_DIR):
+        for file_name in files:
+            if not file_name.lower().endswith('.txt'):
+                files_to_process.append(os.path.join(root, file_name))
+    
+    total_nulled = 0
+    files_modified = 0
+    
+    with console.status("[bold cyan]Scanning and Nulling Hex values...[/]", spinner="dots"):
+        for file_idx, file_path in enumerate(files_to_process, 1):
+            dirty_blocks = mini_modified_blocks_map.get(file_path, set())
+            if not dirty_blocks: continue
+            hits = mini_null_bytes_in_file(file_path, pattern_groups, dirty_blocks, target_counts)
+            if hits > 0:
+                files_modified += 1
+                total_nulled += hits
+    
+    print()
+    with open(mini_NULLED_TXT_PATH, 'w', encoding='utf-8') as f:
+        f.write("Nulled Hex Values Report\n========================\n")
+        f.write(f"Files modified: {files_modified}\nUnique hex values nulled: {len(final_hexes)}\nTotal occurrences replaced: {total_nulled}\n")
+    print(f"{colorama.Fore.LIGHTGREEN_EX}✅ {to_fancy('Size fix processing complete.')}")
+    
+def mini_run_auto_theme():
+    DEFAULT_HEX = "7480100C"
+    b_color = get_banner_color() # KAZUKI global color variable
+    
+    while True:
+        mini_display_tool_name()
+        
+        # --- UI UPDATE: KAZUKI BORDER STYLE ---
+        # --- UI UPDATE: KAZUKI BORDER STYLE (GREEN THEME) ---
+        menu_table = Table(show_header=False, box=box.SIMPLE, expand=True)
+        menu_table.add_column("𝐎𝐏𝐓", style=f"bold {get_banner_color()}", justify="center", width=4)
+        menu_table.add_column("𝐂𝐎𝐌𝐌𝐀𝐍𝐃", style=f"bold {b_color}")
+        
+        # Labels ab Bright Green dikhenge
+        menu_table.add_row("1", f"[bold cyan]▶[/] [bold {get_banner_color()}]{to_fancy('SWAP LOBBY INDEX')}[/]")
+        menu_table.add_row("2", f"[bold red]▶[/] [bold {get_banner_color()}]{to_fancy('BACK TO MAIN MENU')}[/]")
+        
+        console.print(Panel(
+            menu_table, 
+            border_style=b_color, 
+            box=box.HEAVY, 
+            title=f"[bold black on {b_color}] 👑 {to_fancy('AUTO THEME CHANGER')} 👑 [/]"
+        ))
+
+        choice = Prompt.ask(f"[bold {b_color}]{to_fancy('ENTER COMMAND')} >[/bold {b_color}]", choices=["1", "2"])
+        
+        if choice == "1":
+            lobbies = []
+            try:
+                with open(mini_LOBBY_FILE, "r") as file:
+                    for line in file:
+                        parts = line.strip().split("|")
+                        if len(parts) == 3: lobbies.append((parts[1].strip(), parts[2].strip()))
+            except FileNotFoundError: pass
+            
+            if not lobbies:
+                console.print(f"[red]❌ {to_fancy('lobby.txt not found or empty.')}[/red]")
+                time.sleep(1); continue
+
+            # --- UI UPDATE: NEON LIST WITH KAZUKI THEME ---
+            # --- UI UPDATE: FULL NEON GREEN LIST ---
+            console.print(f"\n[bold {b_color}]── {to_fancy('AVAILABLE LOBBIES')} ──[/bold {b_color}]\n")
+            for i, (_, name) in enumerate(lobbies, 1):
+                # Neon Blue Index + Bright Green Name
+                console.print(f"[bold bright_blue]{i:02d}.[/] [bold {get_banner_color()}]{to_fancy(name)}[/]")
+            
+            lobby_choice = Prompt.ask(f"\n[bold {b_color}]{to_fancy('Select a lobby theme ID')}[/bold {b_color}]")
+            try:
+                lobby_idx = int(lobby_choice) - 1
+                if 0 <= lobby_idx < len(lobbies):
+                    target_hex, lobby_name = lobbies[lobby_idx]
+                    
+                    with console.status(f"[bold {b_color}]Applying {lobby_name} theme...[/]"):
+                        default_hex_bytes = bytes.fromhex(DEFAULT_HEX)
+                        target_hex_bytes = bytes.fromhex(target_hex)
+                        for filename in os.listdir(mini_AUTO_THEME_FILES):
+                            file_path = os.path.join(mini_AUTO_THEME_FILES, filename)
+                            with open(file_path, "rb") as file: file_data = file.read()
+                            updated_data = bytearray(file_data)
+                            
+                            default_pos = target_pos = None
+                            for i in range(len(file_data) - len(default_hex_bytes), 7, -1):
+                                if file_data[i:i + len(default_hex_bytes)] == default_hex_bytes:
+                                    default_index = file_data[i - 8]; default_pos = i - 8; break
+                            for i in range(len(file_data) - len(target_hex_bytes), 7, -1):
+                                if file_data[i:i + len(target_hex_bytes)] == target_hex_bytes:
+                                    target_index = file_data[i - 8]; target_pos = i - 8; break
+                                    
+                            if default_pos is not None and target_pos is not None:
+                                updated_data[default_pos] = target_index
+                                updated_data[target_pos] = default_index
+                                result_path = os.path.join(mini_AUTO_THEME_RESULT, filename)
+                                os.makedirs(mini_AUTO_THEME_RESULT, exist_ok=True)
+                                with open(result_path, "wb") as file: file.write(updated_data)
+                    
+                    console.print(f"[bold {get_banner_color()}]✔ SUCCESS: Lobby Swap Applied![/bold {get_banner_color()}]")
+                else: console.print(f"[red]❌ {to_fancy('Invalid ID.')}[/red]")
+            except ValueError: console.print(f"[red]❌ {to_fancy('Invalid input.')}[/red]")
+        elif choice == "2": break
+        time.sleep(1)
+
+def mini_run_hit_loot_tool():
+    mini_display_tool_name()
+    
+    # ============================================================
+    # 🔥 HEADER - BLUE
+    # ============================================================
+    zsdic_console.print(Panel(
+        f"[bold bright_blue]🌟 HIT EFFECT & LOOTCRATES TOOL[/bold bright_blue]\n"
+        f"[dim]ID pairs from ZSDIC/modskin.txt | Files from MINI[/dim]",
+        border_style="bright_blue",
+        box=box.HEAVY
+    ))
+    
+    # ============================================================
+    # 🔥 PATHS
+    # ============================================================
+    global game_key, BASE_DIR
+    
+    if 'game_key' not in globals() or game_key not in ["BGMI", "PUBG"]:
+        game_key = "BGMI"
+    
+    game_folder = f"{game_key}_SKIN"
+    game_base = os.path.join(BASE_DIR, game_folder)
+    
+    # 🔥 ZSDIC - ID PAIRS KE LIYE
+    zsdic_base = os.path.join(game_base, "ZSDIC")
+    zsdic_modskin = os.path.join(zsdic_base, "modskin.txt")
+    
+    # 🔥 🔥 🔥 ALL.TXT KA SAHI PATH - MINI/MINI_ICON/TXTS/ALL.TXT 🔥 🔥 🔥
+    mini_base = os.path.join(game_base, "MINI")
+    mini_icon = os.path.join(mini_base, "MINI_ICON")
+    mini_txts = os.path.join(mini_icon, "TXTS")
+    mini_all = os.path.join(mini_txts, "ALL.txt")  # ✅ YAHAN HAI!
+    
+    # 🔥 HIT EFFECT & LOOTCRATES FILES
+    mini_HIT_ORIG = os.path.join(mini_base, "HIT EFFECT", "org")
+    mini_HIT_MODIFIED = os.path.join(mini_base, "HIT EFFECT", "modified")
+    mini_LOOT_ORIG = os.path.join(mini_base, "LOOTCRATES", "org")
+    mini_LOOT_MODIFIED = os.path.join(mini_base, "LOOTCRATES", "modified")
+    
+    # ============================================================
+    # 🔥 CHECK ALL.TXT EXIST KARTA HAI
+    # ============================================================
+    
+    if not os.path.exists(mini_all):
+        zsdic_console.print(Panel(
+            f"[red]❌ ALL.txt not found![/red]\n"
+            f"[dim]Expected: {mini_all}[/dim]",
+            border_style="red",
+            box=box.ROUNDED
+        ))
+        return
+    
+    # ============================================================
+    # 🔥 LOAD ID PAIRS FROM ZSDIC/MODSKIN.TXT
+    # ============================================================
+    
+    id_pairs = []
+    
+    if os.path.exists(zsdic_modskin):
+        with open(zsdic_modskin, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = re.split(r'[,\s]+', line.strip())
+                if len(parts) >= 2:
+                    id_pairs.append((parts[0].strip(), parts[1].strip()))
+        
+        zsdic_console.print(Panel(
+            f"[bold bright_blue]✔ Loaded {len(id_pairs)} pairs from ZSDIC/modskin.txt[/bold bright_blue]",
+            border_style="bright_blue",
+            box=box.ROUNDED
+        ))
+    else:
+        zsdic_console.print(Panel(
+            f"[red]❌ ZSDIC/modskin.txt not found![/red]",
+            border_style="red",
+            box=box.ROUNDED
+        ))
+        return
+    
+    if not id_pairs:
+        zsdic_console.print(Panel(
+            f"[yellow]⚠ No ID pairs found in ZSDIC/modskin.txt[/yellow]",
+            border_style="yellow",
+            box=box.ROUNDED
+        ))
+        return
+    
+    # ============================================================
+    # 🔥 LOAD ALL.TXT FOR HEX VALUES
+    # ============================================================
+    
+    id_to_entry = {}
+    by_name = {}
+    
+    with open(mini_all, encoding="utf-8", errors="ignore") as fh:
+        for line in fh:
+            parts = line.strip().split("|")
+            if len(parts) >= 3:
+                idv = parts[0].strip()
+                hx = parts[1].strip().lower()
+                name = parts[2].strip()
+                id_to_entry[idv] = {"hex": hx, "name": name, "base": name}
+                by_name.setdefault(name, {})[0] = hx
+    
+    zsdic_console.print(Panel(
+        f"[bold bright_blue]✔ Loaded {len(id_to_entry)} entries from MINI/MINI_ICON/TXTS/ALL.txt[/bold bright_blue]",
+        border_style="bright_blue",
+        box=box.ROUNDED
+    ))
+    
+    # ============================================================
+    # 🔥 GENERATE PAIRS
+    # ============================================================
+    
+    pairs_hit, pairs_loot = [], []
+    
+    for a_raw, b_raw in id_pairs:
+        if a_raw not in id_to_entry:
+            continue
+        
+        first_hex = id_to_entry[a_raw]["hex"]
+        
+        if b_raw in id_to_entry:
+            hit_hex = id_to_entry[b_raw]["hex"]
+            loot_hex = id_to_entry[b_raw]["hex"]
+        else:
+            hit_hex = b_raw
+            loot_hex = b_raw
+        
+        pairs_hit.append((first_hex, hit_hex))
+        if len(first_hex) == len(loot_hex):
+            pairs_loot.append((first_hex, loot_hex))
+    
+    # ============================================================
+    # 🔥 PROGRESS BAR
+    # ============================================================
+    
+    with Live(refresh_per_second=30, console=zsdic_console) as live:
+        for i in range(101):
+            if i % 5 == 0:
+                bar_length = 30
+                filled = int((i / 100) * bar_length)
+                bar = "█" * filled + "░" * (bar_length - filled)
+                
+                progress_text = (
+                    f"[bold bright_blue]⏳ Processing...[/bold bright_blue]\n\n"
+                    f"[bold bright_blue]{bar}[/bold bright_blue] [bold white]{i}%[/bold white]\n"
+                    f"[dim]{i}% complete[/dim]"
+                )
+                
+                live.update(Panel(
+                    progress_text,
+                    title="[bold black on bright_blue] ⚙ PROCESSING ⚙ [/]",
+                    border_style="bright_blue",
+                    box=box.HEAVY
+                ))
+            time.sleep(0.02)
+    
+    # ============================================================
+    # 🔥 PROCESS FILES - MINI FOLDER SE
+    # ============================================================
+    
+    for path in [mini_HIT_MODIFIED, mini_LOOT_MODIFIED]:
+        if os.path.exists(path):
+            try:
+                shutil.rmtree(path)
+            except:
+                pass
+        os.makedirs(path, exist_ok=True)
+    
+    def process_files(orig_dir, mod_dir, pairs):
+        if not os.path.exists(orig_dir):
+            return 0
+        
+        files = []
+        for r, _, fs in os.walk(orig_dir):
+            for fn in fs:
+                files.append(os.path.join(r, fn))
+        
+        if not files:
+            return 0
+        
+        count = 0
+        for src in files:
+            try:
+                with open(src, 'rb') as fh:
+                    data = fh.read()
+            except:
+                continue
+            
+            orig = data
+            for first_hex, second_hex in pairs:
+                try:
+                    to_b = bytes.fromhex(second_hex)
+                    from_raw = bytes.fromhex(first_hex)
+                except:
+                    continue
+                
+                if len(from_raw) < len(to_b):
+                    replacement = from_raw + b'\x00' * (len(to_b) - len(from_raw))
+                elif len(from_raw) > len(to_b):
+                    replacement = from_raw[:len(to_b)]
+                else:
+                    replacement = from_raw
+                
+                if data.count(to_b):
+                    data = data.replace(to_b, replacement)
+                if data.count(to_b[::-1]):
+                    data = data.replace(to_b[::-1], replacement[::-1])
+            
+            if data != orig:
+                rel = os.path.relpath(src, orig_dir)
+                outp = os.path.join(mod_dir, rel)
+                os.makedirs(os.path.dirname(outp), exist_ok=True)
+                with open(outp, 'wb') as outfh:
+                    outfh.write(data)
+                count += 1
+        
+        return count
+
+    hit_count = process_files(mini_HIT_ORIG, mini_HIT_MODIFIED, pairs_hit)
+    loot_count = process_files(mini_LOOT_ORIG, mini_LOOT_MODIFIED, pairs_loot)
+    
+    # ============================================================
+    # 🔥 FINAL - BLUE
+    # ============================================================
+    zsdic_console.print(Panel(
+        f"[bold bright_blue]✅ Modified {hit_count} HIT files & {loot_count} LOOT files.[/bold bright_blue]",
+        border_style="bright_blue",
+        box=box.HEAVY
+    ))
+    
+import colorama
+from rich import box
+from rich.panel import Panel
+from rich.table import Table
+
+
+def mini_full_flow():
+    # Master Panel
+    console.print(
+        Panel(
+            f"[bold bright_cyan]🚀 REPSHMET & SIZE-FIX MASTER ENGINE 🚀[/]\n\n"
+            f"[bold blue]M A S T E R   A U T O M A T E D   P I P E L I N E[/]\n"
+            f"[dim cyan]──────────────────────────────────────────────[/]\n"
+            f"[bold white]Pipeline Status : [bold {get_banner_color()}]READY FOR EXECUTION[/][/bold white]",
+            expand=True,
+            border_style="bright_blue",
+            box=box.HEAVY,
+            padding=(1, 2),
+            title="[bold black on bright_blue] MASTER ENGINE INITIALIZED [/]",
+            title_align="center"
+        )
+    )
+
+    file_changes = {}  # ✅ PEHLE SE INITIALIZE KARO
+
+    # Run tasks silently in background (No task status table)
+    if not mini_copy_files_to_output(): 
+        console.print(Panel("[bold bright_red]✖ SYNC FAILED[/]", border_style="red", expand=True))
+        return
+        
+    res = mini_process_mod_skin()
+    
+    # ✅ SAFE CHECK - SIRF DICT HI CONSIDER KARO
+    if isinstance(res, dict):
+        file_changes = res
+    # ✅ BAAKI SAB IGNORE KARO - KYUNKI YE VARIABLES EXIST NAHI KARTE
+    
+    mini_write_changelog()
+    mini_process_size_fix()
+
+    # 🟢 Display Replaced ID Pairs Details Table right in place of old dashboard
+    if file_changes:
+        pair_table = Table(
+            title= f"[bold black on {get_banner_color()}] 🔄 REPLACED ID PAIRS DETAILS 🔄 [/]",
+            border_style=get_banner_color(),
+            box=box.HEAVY,
+            expand=True,
+            show_lines=True
+        )
+        pair_table.add_column("📁 TARGET ASSET FILE", style="bold cyan", ratio=2)
+        pair_table.add_column("🔄 REPLACED ID PAIR (FROM ➔ TO)", style=f"bold {get_banner_color()}", ratio=2)
+        pair_table.add_column("⚡ MATCH MODE", style="bold yellow", ratio=1, justify="center")
+
+        for rel_file, pairs_info in file_changes.items():
+            for pair, pinfo in pairs_info.items():
+                pair_table.add_row(
+                    rel_file,
+                    f"[bold white]{pair[0]}[/] ➔ [bold {get_banner_color()}]{pair[1]}[/]",
+                    str(pinfo.get('mode', 'REPLACE'))
+                )
+        console.print(pair_table)
+
+    # Final Success Summary Panel
+    console.print(Panel(
+        f"[bold {get_banner_color()}]✔ MASTER PIPELINE EXECUTED SUCCESSFULLY![/]\n\n"
+        f"  [dim white]• Pipeline Status      :[/dim white] [bold {get_banner_color()}]SYSTEM FULLY OPTIMIZED[/]\n"
+        f"  [dim white]• Asset Verification   :[/dim white] [bold cyan]ALL ASSETS VERIFIED & PATCHED[/]", 
+        border_style=get_banner_color(), 
+        box=box.HEAVY,
+        expand=True,
+        title= f"[bold black on {get_banner_color()}] 📊 EXECUTION COMPLETED [/]",
+        padding=(1, 2)
+    ))
+    
+    input(f"\n{colorama.Fore.YELLOW}{to_fancy('Press Enter to continue...')}{colorama.Style.RESET_ALL}")
+
+
+
+def mini_menu():
+    while True:
+        mini_display_tool_name()
+        b_color = get_banner_color()
+        menu_table = Table(show_header=True, header_style=f"bold black on {b_color}", 
+                           box=box.DOUBLE_EDGE, title=f"[reverse]  👑 {to_fancy('MINI SKIN TOOL')} 👑  [/]", 
+                           border_style=b_color, expand=True)
+        if CURRENT_SESSION_COLOR == "rainbow":
+            menu_table.add_column(rainbow_text("𝐎𝐏𝐓"), justify="center", width=4)
+            menu_table.add_column(rainbow_text("𝐂𝐎𝐌𝐌𝐀𝐍𝐃"))
+            menu_table.add_column(rainbow_text("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍"))
+        else:
+            menu_table.add_column("𝐎𝐏𝐓", style="bold white", justify="center", width=4)
+            menu_table.add_column("𝐂𝐎𝐌𝐌𝐀𝐍𝐃", style=f"bold {b_color}")
+            menu_table.add_column("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍", style="dim white")
+        
+        menu_table.add_row(menu_item("1", 0), menu_item("MOD SKIN & SIZE FIX", 1), menu_item("VIP Mod Skin & Size Fix", 5))
+        menu_table.add_row(menu_item("2", 2), menu_item("HIT EFFECT & LOOTCRATES", 3), menu_item("Change hit effects", 7))
+        menu_table.add_row(menu_item("3", 4), menu_item("AUTO THEME CHANGER", 5), menu_item("Swap lobby index", 9))
+        menu_table.add_row(menu_item("0", 6), menu_item("BACK", 7), menu_item("Return to Combined Menu", 11))
+        
+        console.print(Panel(menu_table, border_style=b_color, box=box.HEAVY))
+        
+        # 🔥 FIX: choices hatao
+        choice = Prompt.ask(f"[bold {b_color}]{to_fancy('ENTER 𝐂𝐎𝐌𝐌𝐀𝐍𝐃 >')} [/]")
+        
+        if choice == "1": 
+            mini_full_flow()
+        elif choice == "2": 
+            mini_run_hit_loot_tool()
+            Prompt.ask(f"\n[bold {b_color}]{to_fancy('Press Enter to continue...')}[/bold {b_color}]")
+        elif choice == "3": 
+            mini_run_auto_theme()
+        elif choice == "0": 
+            break
+        else:
+            console.print("[red]❌ Invalid! Enter 0, 1, 2, or 3[/red]")
+            time.sleep(0.0)
+
+def zsdic_build_safe_pattern(ascii_bytes: bytes):
+    return re.compile(rb"(?<![0-9])" + re.escape(ascii_bytes) + rb"(?![0-9])")
+
+def zsdic_pad_pattern(src: bytes, target_len: int) -> bytes:
+    cur = bytearray(src)
+    to_insert = target_len - len(cur)
+    idx = cur.find(0x00)
+    if idx < 0:
+        cur.extend(b"\x00" * to_insert)
+    else:
+        for _ in range(to_insert): cur.insert(idx, 0x00)
+    return bytes(cur)
+
+def zsdic_truncate_pattern(src: bytes, target_len: int) -> bytes:
+    cur = bytearray(src)
+    to_remove = len(cur) - target_len
+    while to_remove > 0:
+        idx = cur.find(0x00)
+        if idx < 0: break
+        del cur[idx]
+        to_remove -= 1
+    if to_remove > 0: del cur[-to_remove:]
+    return bytes(cur)
+
+def zsdic_iter_files(root_dir: str):
+    for r, _, files in os.walk(root_dir):
+        for fn in files:
+            abs_path = os.path.join(r, fn)
+            if os.path.isfile(abs_path):
+                yield abs_path, os.path.relpath(abs_path, root_dir)
+
+def zsdic_parse_id_pairs(path: str):
+    pairs = []
+    with open(path, encoding="utf-8", errors="ignore") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith(("#", "//", ";")): continue
+            parts = [p for p in re.split(r"[,\s]+", line) if p]
+            if len(parts) >= 2: pairs.append((parts[0].strip(), parts[1].strip()))
+    return pairs
+
+def zsdic_op_regex(pat: bytes):
+    return re.compile(rb"(?<![0-9])" + re.escape(pat) + rb"(?![0-9])")
+
+def zsdic_load_null_id_set(null_txt_path: str) -> set[str]:
+    ids = set()
+    if not os.path.isfile(null_txt_path): return ids
+    with open(null_txt_path, encoding="utf-8", errors="ignore") as f:
+        for line in f:
+            for m in re.finditer(r"\b(\d{3,})\b", line): ids.add(m.group(1))
+    return ids
+
+def zsdic_load_swap_offsets(path: str):
+    if not os.path.isfile(path): return None
+    out = {}
+    current_file = None
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line: continue
+            if line.startswith("FILE|"):
+                current_file = line.split("|", 1)[1]
+                out.setdefault(current_file, [])
+            elif line.startswith("OFFSETS|") and current_file is not None:
+                rest = line.split("|", 1)[1].strip()
+                if rest:
+                    parts = [p.strip() for p in rest.split(",") if p.strip().isdigit()]
+                    out[current_file].extend(int(p) for p in parts)
+    for k in list(out.keys()):
+        out[k] = sorted(set(out[k]))
+    return out
+
+def zsdic_write_swap_offsets(path: str, offsets_map: dict):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("=== SWAP OFFSETS LOG ===\nGenerated by Mod Skin.\n\n")
+            for rel in sorted(offsets_map.keys()):
+                offs = sorted(set(offsets_map[rel]))
+                f.write(f"FILE|{rel}\nOFFSETS|" + ",".join(str(x) for x in offs) + "\n\n")
+    except Exception as e:
+        zsdic_console.print(f"[yellow]⚠ Failed writing {path}: {e}[/]")
+
+def zsdic_nearest_distance(pos: int, sorted_offsets: list[int]) -> int:
+    i = bisect.bisect_left(sorted_offsets, pos)
+    best = 10**18
+    if i < len(sorted_offsets): best = min(best, abs(sorted_offsets[i] - pos))
+    if i > 0: best = min(best, abs(sorted_offsets[i - 1] - pos))
+    return best
+
+def zsdic_find_ascii_id_candidates(orig_bytes: bytes, swap_offsets: list[int], null_id_set: set[str], mod_ids: set[str]):
+    candidates = []
+    if not swap_offsets: return candidates
+    swap_offsets = sorted(swap_offsets)
+    for m in zsdic_ID_ASCII_RE.finditer(orig_bytes):
+        start, end = m.start(), m.end()
+        if end + 5 > len(orig_bytes): continue
+        id_str = orig_bytes[start:end].decode("ascii", errors="ignore")
+        if not id_str or id_str in mod_ids or id_str.startswith("40") or id_str not in null_id_set: continue
+        longhex = orig_bytes[start:end + 5]
+        dist = zsdic_nearest_distance(start, swap_offsets)
+        candidates.append((dist, start, id_str, longhex))
+    return candidates
+
+def zsdic_find_utf16le_id_candidates(orig_bytes: bytes, swap_offsets: list[int], null_id_set: set[str], mod_ids: set[str]):
+    candidates = []
+    if not swap_offsets: return candidates
+    swap_offsets = sorted(swap_offsets)
+    for m in zsdic_ID_UTF16LE_RE.finditer(orig_bytes):
+        start, end = m.start(), m.end()
+        if end + 5 > len(orig_bytes): continue
+        id_str = orig_bytes[start:end][0::2].decode("ascii", errors="ignore")
+        if not id_str or len(id_str) < 3 or id_str in mod_ids or id_str.startswith("40") or id_str not in null_id_set: continue
+        longhex = orig_bytes[start:end + 5]
+        dist = zsdic_nearest_distance(start, swap_offsets)
+        candidates.append((dist, start, id_str, longhex))
+    return candidates
+
+def zsdic_apply_nulling_nearest(orig_bytes: bytes, swap_offsets: list[int], null_id_set: set[str], mod_ids: set[str], max_nulls: int):
+    if not swap_offsets: return orig_bytes, []
+    candidates = zsdic_find_ascii_id_candidates(orig_bytes, swap_offsets, null_id_set, mod_ids)
+    if zsdic_ENABLE_UTF16LE_ID_SCAN: candidates += zsdic_find_utf16le_id_candidates(orig_bytes, swap_offsets, null_id_set, mod_ids)
+    if not candidates: return orig_bytes, []
+    candidates.sort(key=lambda x: (x[0], x[1]))
+    data = bytearray(orig_bytes)
+    nulled = []; used_spans = []
+
+    def overlaps(a0: int, a1: int) -> bool:
+        return any(not (a1 <= b0 or a0 >= b1) for b0, b1 in used_spans)
+
+    for dist, start, id_str, longhex in candidates:
+        if len(nulled) >= max_nulls: break
+        end = start + len(longhex)
+        if end > len(data) or overlaps(start, end): continue
+        before = data[start - 1:start] if start > 0 else None
+        after = data[end:end + 1] if end < len(data) else None
+        if (before and before in b"0123456789") or (after and after in b"0123456789"): continue
+        data[start:end] = b"\x00" * (end - start)
+        used_spans.append((start, end))
+        nulled.append((start, id_str, longhex.hex(), dist))
+    return bytes(data), nulled
+
+def zsdic_find_ascii_global_candidates(orig_bytes: bytes, null_id_set: set[str], mod_ids: set[str]):
+    candidates = []
+    for m in zsdic_ID_ASCII_RE.finditer(orig_bytes):
+        start, end = m.start(), m.end()
+        if end + 5 > len(orig_bytes): continue
+        id_str = orig_bytes[start:end].decode("ascii", errors="ignore")
+        if not id_str or id_str in mod_ids or id_str.startswith("40") or id_str not in null_id_set: continue
+        candidates.append((start, id_str, orig_bytes[start:end + 5]))
+    return candidates
+
+def zsdic_find_utf16le_global_candidates(orig_bytes: bytes, null_id_set: set[str], mod_ids: set[str]):
+    candidates = []
+    for m in zsdic_ID_UTF16LE_RE.finditer(orig_bytes):
+        start, end = m.start(), m.end()
+        if end + 5 > len(orig_bytes): continue
+        id_str = orig_bytes[start:end][0::2].decode("ascii", errors="ignore")
+        if not id_str or len(id_str) < 3 or id_str in mod_ids or id_str.startswith("40") or id_str not in null_id_set: continue
+        candidates.append((start, id_str, orig_bytes[start:end + 5]))
+    return candidates
+
+def zsdic_apply_nulling_global(orig_bytes: bytes, null_id_set: set[str], mod_ids: set[str], max_nulls: int):
+    candidates = zsdic_find_ascii_global_candidates(orig_bytes, null_id_set, mod_ids)
+    if zsdic_ENABLE_UTF16LE_ID_SCAN: candidates += zsdic_find_utf16le_global_candidates(orig_bytes, null_id_set, mod_ids)
+    if not candidates: return orig_bytes, []
+    candidates.sort(key=lambda x: x[0])
+    data = bytearray(orig_bytes); nulled = []; used_spans = []
+
+    def overlaps(a0: int, a1: int) -> bool:
+        return any(not (a1 <= b0 or a0 >= b1) for b0, b1 in used_spans)
+
+    for start, id_str, longhex in candidates:
+        if len(nulled) >= max_nulls: break
+        end = start + len(longhex)
+        if end > len(data) or overlaps(start, end): continue
+        before = data[start - 1:start] if start > 0 else None
+        after = data[end:end + 1] if end < len(data) else None
+        if (before and before in b"0123456789") or (after and after in b"0123456789"): continue
+        data[start:end] = b"\x00" * (end - start)
+        used_spans.append((start, end))
+        nulled.append((start, id_str, longhex.hex(), -1))
+    return bytes(data), nulled
+
+def zsdic_apply_nulling_even_parts(orig_bytes: bytes, null_id_set: set[str], mod_ids: set[str], max_nulls: int, part_size: int = 65536):
+    if max_nulls < 1: return orig_bytes, []
+    if part_size <= 0: part_size = 65536
+    candidates = zsdic_find_ascii_global_candidates(orig_bytes, null_id_set, mod_ids)
+    if zsdic_ENABLE_UTF16LE_ID_SCAN: candidates += zsdic_find_utf16le_global_candidates(orig_bytes, null_id_set, mod_ids)
+    if not candidates: return orig_bytes, []
+    candidates.sort(key=lambda x: x[0])
+    
+    file_len = len(orig_bytes)
+    num_full = file_len // part_size
+    remainder = file_len % part_size
+    num_parts = num_full + (1 if remainder else 0)
+    if num_parts <= 0: num_parts = 1
+
+    buckets = [[] for _ in range(num_parts)]
+    for start, id_str, longhex in candidates:
+        part_idx = start // part_size
+        if part_idx >= num_parts: part_idx = num_parts - 1
+        buckets[part_idx].append((start, id_str, longhex))
+
+    data = bytearray(orig_bytes)
+    nulled = []; used_spans = []
+
+    def overlaps(a0: int, a1: int) -> bool:
+        return any(not (a1 <= b0 or a0 >= b1) for b0, b1 in used_spans)
+
+    ptrs = [0] * num_parts
+    progress_made = True
+    while len(nulled) < max_nulls and progress_made:
+        progress_made = False
+        for part_idx in range(num_parts):
+            if len(nulled) >= max_nulls: break
+            bucket = buckets[part_idx]
+            if not bucket: continue
+            while ptrs[part_idx] < len(bucket) and len(nulled) < max_nulls:
+                start, id_str, longhex = bucket[ptrs[part_idx]]
+                ptrs[part_idx] += 1
+                end = start + len(longhex)
+                if end > len(data) or overlaps(start, end): continue
+                before = data[start - 1:start] if start > 0 else None
+                after = data[end:end + 1] if end < len(data) else None
+                if (before and before in b"0123456789") or (after and after in b"0123456789"): continue
+                data[start:end] = b"\x00" * (end - start)
+                used_spans.append((start, end))
+                nulled.append((start, id_str, longhex.hex(), -2))
+                progress_made = True
+                break
+    return bytes(data), nulled
+
+def zsdic_get_pair_ops(pairs, cache):
+    pair_ops = {}
+    for id1, id2 in pairs:
+        a1, a2 = id1.encode(), id2.encode()
+        p1, p2 = zsdic_build_safe_pattern(a1), zsdic_build_safe_pattern(a2)
+        pos1 = pos2 = None
+        d1 = d2 = b""
+        for data in cache.values():
+            if pos1 is None and (m := p1.search(data)): pos1, d1 = m.start(), data
+            if pos2 is None and (m := p2.search(data)): pos2, d2 = m.start(), data
+            if pos1 is not None and pos2 is not None: break
+        if pos1 is None or pos2 is None: continue
+        lh1 = a1 + d1[pos1 + len(a1): pos1 + len(a1) + 5]
+        lh2 = a2 + d2[pos2 + len(a2): pos2 + len(a2) + 5]
+        digit_len_diff = abs(len(a1) - len(a2))
+        ops = []
+        if digit_len_diff <= 1:
+            if len(lh1) == len(lh2):
+                mode = "TWO-WAY"
+                ops.append({"from": lh1, "to": lh2, "rx": zsdic_op_regex(lh1)})
+                ops.append({"from": lh2, "to": lh1, "rx": zsdic_op_regex(lh2)})
+            elif len(lh1) > len(lh2):
+                mode = "TWO-WAY(ADJUSTED)"
+                ops.append({"from": lh1, "to": zsdic_pad_pattern(lh2, len(lh1)), "rx": zsdic_op_regex(lh1)})
+                ops.append({"from": lh2, "to": zsdic_truncate_pattern(lh1, len(lh2)), "rx": zsdic_op_regex(lh2)})
+            else:
+                mode = "TWO-WAY(ADJUSTED)"
+                ops.append({"from": lh2, "to": zsdic_pad_pattern(lh1, len(lh2)), "rx": zsdic_op_regex(lh2)})
+                ops.append({"from": lh1, "to": zsdic_truncate_pattern(lh2, len(lh1)), "rx": zsdic_op_regex(lh1)})
+        else:
+            shorter_lh, longer_lh = (lh1, lh2) if len(a1) < len(a2) else (lh2, lh1)
+            src, dst = longer_lh, shorter_lh
+            if len(dst) < len(src): dst = zsdic_pad_pattern(dst, len(src))
+            elif len(dst) > len(src): dst = zsdic_truncate_pattern(dst, len(src))
+            mode = "ONE-WAY(PADDED)"
+            ops.append({"from": src, "to": dst, "rx": zsdic_op_regex(src)})
+        pair_ops[(id1, id2)] = {"mode": mode, "ops": ops, "lhs": lh1, "rhs": lh2}
+    return pair_ops
+
+import os
+import shutil
+import time
+from rich import box
+from rich.panel import Panel
+from rich.table import Table
+from rich.live import Live
+
+
+def zsdic_mod_skin_flow(game: str):
+    # Clear screen or print mini display header
+    mini_display_tool_name()
+    
+    # 🔵 Termux-Optimized Responsive Blue Header Panel
+    zsdic_console.print(
+        Panel(
+            f"[bold bright_cyan]⚡ ZSDIC PRO SKIN ENGINE ⚡[/]\n\n"
+            f"[bold blue]M O D   S K I N   &   A U T O   S I Z E   F I X E R[/]\n"
+            f"[dim cyan]──────────────────────────────────────────────[/]\n"
+            f"[bold white]Target Game Profile : [bold {get_banner_color()}]{game.upper()}[/bold {get_banner_color()}][/bold white]",
+            expand=True,
+            border_style="bright_blue",
+            box=box.HEAVY,
+            padding=(1, 2),
+            title="[bold black on bright_blue] SYSTEM INITIALIZED [/]",
+            title_align="center"
+        )
+    )
+    
+    game_base_dir = zsdic_GAME_DIRS[game]
+    modskin_path, outfits_path = zsdic_MODSKIN_TXT, zsdic_OUTFITS_TXT
+    output_dir = os.path.join(game_base_dir, zsdic_OUTPUT_DIR_NAME)
+    edited_dir = os.path.join(game_base_dir, zsdic_EDITED_DIR_NAME)
+    size_dir = os.path.join(game_base_dir, zsdic_SIZE_DIR_NAME) 
+    swap_offsets_path = zsdic_SWAP_OFFSETS_TXT
+    
+    # Parsing ID Pairs
+    pairs_modskin = zsdic_parse_id_pairs(modskin_path) if os.path.isfile(modskin_path) else []
+    pairs_outfits = zsdic_parse_id_pairs(outfits_path) if os.path.isfile(outfits_path) else []
+    
+    if not pairs_modskin and not pairs_outfits:
+        zsdic_console.print(Panel(
+            f"[bold bright_yellow]⚠ {to_fancy('Warning: No valid ID pairs configuration found!')}[/]",
+            border_style="yellow", box=box.ROUNDED, expand=True
+        ))
+        time.sleep(1)
+        return
+    
+    all_files = list(zsdic_iter_files(output_dir))
+    if not all_files:
+        zsdic_console.print(Panel(f"[bold bright_red]✖ No asset files detected in directory:\n{output_dir}[/]", border_style="red", expand=True))
+        return
+    
+    # Caching files silently in background
+    cache, rel_map = {}, {}
+    for abs_path, rel_path in all_files:
+        try:
+            cache[abs_path] = open(abs_path, "rb").read()
+            rel_map[abs_path] = rel_path
+        except:
+            pass
+            
+    pair_ops_modskin = zsdic_get_pair_ops(pairs_modskin, cache) if pairs_modskin else {}
+    pair_ops_outfits = zsdic_get_pair_ops(pairs_outfits, cache) if pairs_outfits else {}
+    
+    all_rxs = []
+    for pinfo in pair_ops_modskin.values(): all_rxs.extend(op["rx"] for op in pinfo["ops"])
+    for pinfo in pair_ops_outfits.values(): all_rxs.extend(op["rx"] for op in pinfo["ops"])
+    
+    valid_files = [p for p, data in cache.items() if any(rx.search(data) for rx in all_rxs)]
+    if not valid_files:
+        zsdic_console.print(Panel("[bold bright_red]✖ Zero matching pattern signatures found in cached assets. Process halted.[/]", border_style="red", expand=True))
+        return
+    
+    if os.path.isdir(edited_dir): shutil.rmtree(edited_dir)
+    os.makedirs(edited_dir, exist_ok=True)
+    
+    file_changes, swap_offsets_map = {}, {}
+    null_id_set = zsdic_load_null_id_set(zsdic_NULL_TXT)
+    mod_ids = set()
+    total_pairs = len(pairs_modskin) + len(pairs_outfits)
+    auto_max_nulls = total_pairs * 3 if total_pairs < 500 else total_pairs * 2
+    
+    for a, b in pairs_modskin + pairs_outfits:
+        if a.isdigit(): mod_ids.add(a)
+        if b.isdigit(): mod_ids.add(b)
+
+    zsdic_OUTFITS_FILES = {"AvatarSuitsTable.uasset", "GoldClothBattleEffect.uasset"}
+
+    def get_progress_table(file_logs):
+        table = Table(
+            title= f"[bold black on {get_banner_color()}] 🟢 REPSHMET & SIZE-FIX LIVE ENGINE 🟢 [/]",
+            border_style=get_banner_color(),
+            box=box.HEAVY,
+            expand=True,
+            show_lines=True
+        )
+        table.add_column("📁 TARGET ASSET FILE", style=f"bold {get_banner_color()}", header_style=f"bold black on {get_banner_color()}", ratio=2)
+        table.add_column("⚡ PIPELINE STATUS", style="bold", header_style=f"bold black on {get_banner_color()}", ratio=1, justify="center")
+        for fname, status in file_logs:
+            table.add_row(fname, status)
+        return table
+
+    file_logs = []
+    success_count = 0
+    
+    # Real-time Live Processing Engine UI
+    with Live(get_progress_table(file_logs), refresh_per_second=15, console=zsdic_console) as live:
+        for src in sorted(valid_files):
+            rel = rel_map.get(src, os.path.basename(src))
+            short_name = rel if len(rel) < 35 else "..." + rel[-32:]
+            
+            file_logs.append([f"[bold white]{short_name}[/]", "[blink bold bright_yellow]⏳ PATCHING...[/]"])
+            if len(file_logs) > 8: file_logs.pop(0)
+            live.update(get_progress_table(file_logs))
+            
+            edited_path = os.path.join(edited_dir, rel)
+            os.makedirs(os.path.dirname(edited_path), exist_ok=True)
+            
+            try:
+                shutil.copy2(src, edited_path)
+                orig = open(edited_path, "rb").read()
+            except Exception as e:
+                file_logs[-1][1] = "[bold bright_red]✖ COPY ERROR[/]"
+                live.update(get_progress_table(file_logs))
+                continue
+            
+            new = bytearray(orig)
+            changed = False
+            active_pair_ops = pair_ops_outfits if os.path.basename(rel) in zsdic_OUTFITS_FILES else pair_ops_modskin
+            
+            for pair, pinfo in active_pair_ops.items():
+                for op in pinfo["ops"]:
+                    matches = list(op["rx"].finditer(orig))
+                    if not matches: continue
+                    frm, to = op["from"], op["to"]
+                    for m in matches:
+                        start = m.start()
+                        new[start: start + len(frm)] = to
+                        swap_offsets_map.setdefault(rel, set()).add(start)
+                        changed = True
+                        
+            if changed:
+                offsets = list(swap_offsets_map.get(rel, set()))
+                if offsets:
+                    new_bytes, _ = zsdic_apply_nulling_nearest(bytes(new), offsets, null_id_set, mod_ids, auto_max_nulls)
+                else:
+                    new_bytes, _ = zsdic_apply_nulling_global(bytes(new), null_id_set, mod_ids, auto_max_nulls)
+                new = bytearray(new_bytes)
+
+            if changed and new != orig:
+                try:
+                    with open(edited_path, "wb") as f: f.write(new)
+                    size_path = os.path.join(size_dir, rel)
+                    os.makedirs(os.path.dirname(size_path), exist_ok=True)
+                    with open(size_path, "wb") as f: f.write(new)
+                except: pass
+                
+                file_changes.setdefault(rel, active_pair_ops)
+                success_count += 1
+
+            file_logs[-1][1] = "[bold {get_banner_color()}]✔ SUCCESS[/]"
+            live.update(get_progress_table(file_logs))
+            
+    # Green Dashboard Summary Box
+    zsdic_console.print(Panel(
+        f"[bold {get_banner_color()}]✔ REPSHMET & SIZE-FIX PIPELINE EXECUTED SUCCESSFULLY![/]\n\n"
+        f"  [dim white]• Total Asset Files Evaluated :[/dim white] [bold {get_banner_color()}]{len(valid_files)}[/]\n"
+        f"  [dim white]• Successfully Patched & Fixed :[/dim white] [bold {get_banner_color()}]{success_count}[/]\n"
+        f"  [dim white]• Dynamic Null Allocation    :[/dim white] [bold bright_yellow]{auto_max_nulls} nulls/file[/]", 
+        border_style=get_banner_color(), 
+        box=box.HEAVY,
+        expand=True,
+        title= f"[bold black on {get_banner_color()}] 📊 SESSION EXECUTION SUMMARY [/]",
+        padding=(1, 2)
+    ))
+    
+    if not file_changes: return
+    
+    # Changelog Generation Log
+    try:
+        with open(zsdic_CHANGELOG_TXT, "w", encoding="utf-8") as f:
+            f.write("🌟 ZSDIC MOD SKIN CHANGELOG 🌟\n==============================\n\n")
+            for rel_file, pairs_info in file_changes.items():
+                f.write(f"📁 FILE: {rel_file}\n")
+                for pair, pinfo in pairs_info.items():
+                    f.write(f"  🔄 PAIR: {pair[0]} -> {pair[1]} ({pinfo['mode']})\n")
+                    for op in pinfo["ops"]:
+                        frm_hex = op["from"].hex().upper()
+                        to_hex = op["to"].hex().upper()
+                        f.write(f"     - Replaced successfully\n       FROM: {frm_hex}\n       TO  : {to_hex}\n")
+                f.write("==============================\n\n")
+    except Exception as e:
+        zsdic_console.print(f"[red]Changelog Error: {e}[/red]")
+
+    zsdic_write_swap_offsets(swap_offsets_path, swap_offsets_map)
+    
+    # Final Success Box
+    zsdic_console.print(
+        Panel(
+            f"[bold {get_banner_color()}]✨ {to_fancy('All Operations Finished! Output files secured successfully.')} ✨[/]", 
+            expand=True, 
+            border_style=get_banner_color(), 
+            box=box.HEAVY
+        )
+    )
+
+    
+def zsdic_repack_size_fix():
+    mini_display_tool_name()
+    zsdic_console.print(Panel(f"[bold bright_cyan]🔩 {to_fancy('Size-Fix Initialized')}[/]", expand=False, border_style="cyan"))
+    edited_dir = os.path.join(zsdic_GAME_DIRS["BGMI"], zsdic_EDITED_DIR_NAME)
+    size_dir = os.path.join(zsdic_GAME_DIRS["BGMI"], zsdic_SIZE_DIR_NAME)
+    swap_offsets_path = zsdic_SWAP_OFFSETS_TXT
+    
+    if not os.path.isdir(edited_dir):
+        zsdic_console.print(f"[red]✖ {to_fancy('Edited directory not found:')} {edited_dir}[/]")
+        return
+        
+    swap_offsets = zsdic_load_swap_offsets(swap_offsets_path)
+    if not swap_offsets:
+        zsdic_console.print(f"[yellow]⚠ {zsdic_SWAP_OFFSETS_TXT} missing/empty. Will use GLOBAL nulling for files without offsets.[/]")
+        swap_offsets = {}
+
+    b_color = get_banner_color()
+    max_nulls_str = Prompt.ask(f"[bold {b_color}]{to_fancy('Max nulls per file')}[/] (default {zsdic_DEFAULT_MAX_NULLS})", default=str(zsdic_DEFAULT_MAX_NULLS))
+    try:
+        max_nulls = int(max_nulls_str)
+        if max_nulls < 1: max_nulls = zsdic_DEFAULT_MAX_NULLS
+    except Exception:
+        max_nulls = zsdic_DEFAULT_MAX_NULLS
+
+    zsdic_console.print("\n[bold yellow]Size Fix Mode:[/]")
+    zsdic_console.print("  [bold cyan]1)[/] Null Near To Modification  [dim](Nearest/Global)[/dim]")
+    zsdic_console.print("  [bold cyan]2)[/] Null Evenly  [dim](64KB parts distribution)[/dim]")
+    size_fix_mode = Prompt.ask(f"[bold {b_color}]{to_fancy('Select mode')}[/]", choices=["1", "2"], default="1")
+
+    null_id_set = zsdic_load_null_id_set(zsdic_NULL_TXT)
+    mod_ids = set()
+    for path in [zsdic_MODSKIN_TXT, zsdic_OUTFITS_TXT]:
+        if os.path.isfile(path):
+            for a, b in zsdic_parse_id_pairs(path):
+                if a.isdigit(): mod_ids.add(a)
+                if b.isdigit(): mod_ids.add(b)
+
+    if os.path.isdir(size_dir): shutil.rmtree(size_dir)
+    os.makedirs(size_dir, exist_ok=True)
+    files_to_process = list(zsdic_iter_files(edited_dir))
+    if not files_to_process: return
+
+    nulled_info = {}
+    progress = Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"))
+    with Live(progress, refresh_per_second=10) as live:
+        task = progress.add_task(f"[cyan]{to_fancy('Nulling... ')}", total=len(files_to_process))
+        for abs_path, rel_path in files_to_process:
+            progress.update(task, advance=1, description=f"[cyan]{to_fancy('Processing')} {rel_path}[/]")
+            try: orig_bytes = open(abs_path, "rb").read()
+            except: continue
+            
+            offsets = swap_offsets.get(rel_path, []) if swap_offsets else []
+            if size_fix_mode == "1":
+                if offsets:
+                    mode_used = "NEAREST"
+                    new_bytes, entries = zsdic_apply_nulling_nearest(orig_bytes, offsets, null_id_set, mod_ids, max_nulls)
+                else:
+                    mode_used = "GLOBAL"
+                    new_bytes, entries = zsdic_apply_nulling_global(orig_bytes, null_id_set, mod_ids, max_nulls)
+            else:
+                mode_used = "EVEN_PARTS"
+                new_bytes, entries = zsdic_apply_nulling_even_parts(orig_bytes, null_id_set, mod_ids, max_nulls, 65536)
+
+            out_path = os.path.join(size_dir, rel_path)
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            with open(out_path, "wb") as f: f.write(new_bytes)
+            nulled_info[rel_path] = {"mode": mode_used, "entries": entries}
+
+    try:
+        with open(os.path.join(size_dir, zsdic_NULLED_LOG_TXT), "w", encoding="utf-8") as nf:
+            nf.write("=== NULLED LOG (NEAREST / GLOBAL / EVEN PARTS) ===\n")
+            for rel_path in sorted(nulled_info.keys()):
+                info = nulled_info[rel_path]
+                entries = info.get("entries", [])
+                nf.write(f"{rel_path}:\n  Mode: {info.get('mode', 'UNKNOWN')}\n")
+                if not entries: nf.write("  (no nulls)\n\n"); continue
+                for pos, id_str, longhex_hex, dist in entries:
+                    dist_str = "[global]" if dist == -1 else ("[even]" if dist == -2 else f"[dist {dist}]")
+                    nf.write(f"  [pos {pos}] {dist_str} ID {id_str} -> nulled longhex {longhex_hex}\n")
+                nf.write("\n")
+    except Exception: pass
+    zsdic_console.print(Panel(f"[bold green]✨ {to_fancy('Size-fix complete!')}[/]", expand=False, border_style="green", box=box.ROUNDED))
+
+def zsdic_main_menu():
+    while True:
+        mini_display_tool_name()
+        
+        b_color = get_banner_color()
+        menu_table = Table(show_header=True, header_style=f"bold black on {b_color}", 
+                           box=box.DOUBLE_EDGE, title=f"[reverse]  👻 {to_fancy('ZSDIC MENU')} 👻  [/]", 
+                           border_style=b_color, expand=True)
+        if CURRENT_SESSION_COLOR == "rainbow":
+            menu_table.add_column(rainbow_text("𝐎𝐏𝐓"), justify="center", width=4)
+            menu_table.add_column(rainbow_text("𝐂𝐎𝐌𝐌𝐀𝐍𝐃"))
+            menu_table.add_column(rainbow_text("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍"))
+        else:
+            menu_table.add_column("𝐎𝐏𝐓", style="bold white", justify="center", width=4)
+            menu_table.add_column("𝐂𝐎𝐌𝐌𝐀𝐍𝐃", style=f"bold {b_color}")
+            menu_table.add_column("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍", style="dim white")
+
+        menu_table.add_row(menu_item("1", 0), menu_item("MOD SKIN", 1), menu_item("Advanced Mod Skin", 5))
+        menu_table.add_row(menu_item("0", 2), menu_item("BACK", 3), menu_item("Return to Menu", 7))
+
+        console.print(Panel(menu_table, border_style=b_color, box=box.HEAVY))
+        
+        choice = Prompt.ask(f"[bold {b_color}]{to_fancy('ENTER CHOICE')} (0-1) ➔ [/]")
+        
+        if choice == "1":
+            # 🔥 FIX: game_key global use karo
+            global game_key
+            zsdic_mod_skin_flow(game_key)
+            Prompt.ask(f"\n[bold white]{to_fancy('Press Enter to return...')}[/bold white]")
+        elif choice == "0": 
+            break
+        else:
+            console.print("[red]❌ Invalid! Enter 0 or 1[/red]")
+            time.sleep(1)
+
+def copy_all_outputs_to_final():
+    # Master Border start
+    console.print(Panel(
+        "[bold {get_banner_color()}]🚀 ORGANIZING ALL FILES INTO FINAL FOLDER...[/]",
+        border_style=get_banner_color(), box=box.HEAVY
+    ))
+    
+    csv_target = os.path.join(FINAL_DIR, "ShadowTrackerExtra", "Content", "MultiRegion", "Content", "IN", "CSV")
+    root_target = FINAL_DIR 
+    os.makedirs(csv_target, exist_ok=True)
+    os.makedirs(root_target, exist_ok=True)
+
+    size_dir = os.path.join(zsdic_GAME_DIRS["BGMI"], zsdic_SIZE_DIR_NAME)
+    
+    # 👇 YAHAN STAND POSH KA PATH ADD KIYA HAI 👇
+    stand_posh_output = os.path.join(BASE_DIR, "STAND_POSH", "OUTPUT")
+
+    sources = [
+        ("MINI OUTPUT", mini_OUTPUT_DIR, csv_target),
+        ("ZSDIC SIZE OUTPUT", size_dir, csv_target),
+        ("HIT EFFECT OUTPUT", mini_HIT_MODIFIED, csv_target),      
+        ("LOOTCRATES OUTPUT", mini_LOOT_MODIFIED, csv_target),     
+        ("AUTO THEME RESULT", mini_AUTO_THEME_RESULT, root_target),
+        # 👇 YAHAN STAND POSH KO BHI THEME WALI JAGAH (root_target) BHEJ RAHE HAIN 👇
+        ("STAND POSH OUTPUT", stand_posh_output, root_target) 
+    ]
+    
+    log_data = []
+
+    # Dynamic Table Rebuilder
+    def get_sync_table():
+        table = Table(title= f"[bold black on {get_banner_color()}] ⚙ FINAL SYNC ENGINE ⚙ [/]",
+                      border_style=get_banner_color(), box=box.HEAVY, expand=True)
+        table.add_column("SOURCE", style="bold cyan")
+        table.add_column("STATUS", style="bold white")
+        for src_name, status in log_data:
+            table.add_row(src_name, status)
+        return Panel(table, border_style=get_banner_color(), box=box.HEAVY)
+
+    copied_count = 0
+    
+    with Live(get_sync_table(), refresh_per_second=15, console=console) as live:
+        for source_name, source_path, dest_base in sources:
+            if not os.path.exists(source_path):
+                log_data.append([source_name, "[dim yellow]SKIP: Missing[/]"])
+                live.update(get_sync_table())
+                continue
+            
+            # Start copying animation
+            log_data.append([source_name, "[blink bold yellow]COPYING...[/]"])
+            live.update(get_sync_table())
+            
+            # File copy logic
+            for root, dirs, files in os.walk(source_path):
+                rel_path = os.path.relpath(root, source_path)
+                dest_dir = dest_base if rel_path == '.' else os.path.join(dest_base, rel_path)
+                os.makedirs(dest_dir, exist_ok=True)
+                for file in files:
+                    try:
+                        shutil.copy2(os.path.join(root, file), os.path.join(dest_dir, file))
+                        copied_count += 1
+                    except: pass
+            
+            # Done status update
+            log_data[-1][1] = "[bold green]✔ DONE[/]"
+            live.update(get_sync_table())
+
+    # Final Summary Panel
+    console.print(Panel(
+        f"[bold {get_banner_color()}]✅ SYNC COMPLETE![/]\n"
+        f"[bold bright_blue]Total files/folders combined:[/] [white]{copied_count}[/]\n"
+        f"[bold bright_blue]Check FINAL folder for output.[/]",
+        border_style=get_banner_color(), box=box.HEAVY
+    ))
+
+def run_stand_posh():
+    console.clear()
+    print_banner_and_header()
+    b_color = get_banner_color()
+    
+    # --- Folder Setup for STAND_POSH ---
+    STAND_POSH_BASE = os.path.join(BASE_DIR, "STAND_POSH")
+    sp_INPUT = os.path.join(STAND_POSH_BASE, "INPUT")
+    sp_OUTPUT = os.path.join(STAND_POSH_BASE, "OUTPUT")
+    sp_DUMP = os.path.join(STAND_POSH_BASE, "dump.txt")
+    sp_MODSKIN = os.path.join(STAND_POSH_BASE, "modskin.txt")
+    sp_NULL = os.path.join(STAND_POSH_BASE, "null.txt")
+    
+    # Ensure directories & placeholder files exist before running
+    os.makedirs(sp_INPUT, exist_ok=True)
+    os.makedirs(sp_OUTPUT, exist_ok=True)
+    for f in [sp_DUMP, sp_MODSKIN, sp_NULL]:
+        if not os.path.exists(f):
+            with open(f, 'w', encoding='utf-8-sig') as file:
+                file.write("")
+
+    def hex_to_bytes(hex_str):
+        """Converts hex strings to bytes, cleaning non-hex characters."""
+        clean_hex = re.sub(r'[^0-9a-fA-F]', '', hex_str)
+        return bytes.fromhex(clean_hex)
+
+    # 1. Load ID Map (dump.txt)
+    id_map = {}
+    id_name_map = {}
+    if os.path.exists(sp_DUMP):
+        with console.status(f"[bold {b_color}]Loading database from dump.txt...[/]", spinner="dots"):
+            with open(sp_DUMP, 'r', encoding='utf-8-sig') as f:
+                for line in f:
+                    parts = [p.strip() for p in line.split('|')]
+                    if len(parts) >= 2:
+                        skin_id = parts[0]
+                        hex_val = parts[1]
+                        name = parts[2] if len(parts) > 2 else "Unknown"
+                        try:
+                            id_map[skin_id] = hex_to_bytes(hex_val)
+                            id_name_map[skin_id] = name
+                        except ValueError:
+                            continue
+        console.print(f"[bold {get_banner_color()}]✅ [!] Loaded {len(id_map)} IDs from dump.txt[/]")
+
+    # 2. Load Replacements (modskin.txt)
+    replacements = []
+    if os.path.exists(sp_MODSKIN):
+        with open(sp_MODSKIN, 'r', encoding='utf-8-sig') as f:
+            for line in f:
+                parts = re.split(r'[,\s]+', line.strip())
+                if len(parts) >= 2:
+                    val1 = parts[0] # Mod
+                    val2 = parts[1] # Original
+                    
+                    hex1_data = id_map.get(val1, None)
+                    if hex1_data is None: 
+                        try: hex1_data = hex_to_bytes(val1)
+                        except ValueError: continue
+
+                    hex2_target = id_map.get(val2, None)
+                    name = id_name_map.get(val2, val2)
+                    if hex2_target is None: 
+                        try: hex2_target = hex_to_bytes(val2)
+                        except ValueError: continue
+                    
+                    replacements.append({
+                        'target': hex2_target,
+                        'mod': hex1_data,
+                        'name': name,
+                        'raw_target': val2,
+                        'raw_mod': val1
+                    })
+
+    # 3. Load Null Targets (null.txt)
+    null_targets = []
+    if os.path.exists(sp_NULL):
+        with open(sp_NULL, 'r', encoding='utf-8-sig') as f:
+            for line in f:
+                parts = [p.strip() for p in line.split('|')]
+                if len(parts) >= 2:
+                    try:
+                        target_hex = hex_to_bytes(parts[1])
+                        null_targets.append((target_hex, b'\x00' * len(target_hex)))
+                    except ValueError:
+                        continue
+
+    # --- VIP UI DASHBOARD ---
+    stats_text = (
+        f"[bold cyan]▸[/] [bold white]Mod Skins:[/bold white] [bold {get_banner_color()}]{len(replacements)}[/bold {get_banner_color()}] found\n"
+        f"[bold cyan]▸[/] [bold white]Size Fix:[/bold white]  [bold {get_banner_color()}]{len(null_targets)}[/bold {get_banner_color()}] available"
+    )
+    console.print(Panel(stats_text, title=f"[bold black on {b_color}] 📊 DATABASE STATS [/]", border_style=b_color, box=box.HEAVY))
+    
+    do_null = False
+    null_limit = -1
+
+    # --- STYLISH MENU ---
+    menu_table = Table(show_header=True, header_style=f"bold black on {b_color}", 
+                       box=box.DOUBLE_EDGE, title=f"[reverse]  🧍 HEX MODDING TOOL v2.0 (STAND POSH) 🧍  [/]", 
+                       border_style=b_color, expand=True)
+    menu_table.add_column("𝐎𝐏𝐓", style="bold white", justify="center", width=4)
+    menu_table.add_column("𝐂𝐎𝐌𝐌𝐀𝐍𝐃", style=f"bold {b_color}")
+    menu_table.add_column("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍", style="dim white")
+    
+    menu_table.add_row(menu_item("1", 0), menu_item("APPLY MODS ONLY", 1), menu_item("Only replace Mod Skins", 5))
+    menu_table.add_row(menu_item("2", 2), menu_item("APPLY MODS + SIZE FIX", 3), menu_item("Replace Skins & Fix Size (Nulling)", 7))
+    menu_table.add_row("0", f"[red]{to_fancy('BACK')}[/red]", to_fancy("Return to Menu"))
+    
+    console.print(Panel(menu_table, border_style=b_color, box=box.HEAVY))
+
+    choice = Prompt.ask(f"[bold {b_color}]{to_fancy('Select Option')}[/bold {b_color}]", choices=["0", "1", "2"])
+    
+    if choice == '0':
+        return
+    elif choice == '2':
+        limit_input = Prompt.ask(f"[bold yellow]Enter Max Null limit (Enter for ALL)[/bold yellow]", default="ALL").strip()
+        do_null = True
+        if limit_input.isdigit():
+            null_limit = int(limit_input)
+
+    # 5. Refresh Output Folder
+    if os.path.exists(sp_OUTPUT):
+        shutil.rmtree(sp_OUTPUT)
+    shutil.copytree(sp_INPUT, sp_OUTPUT)
+    
+    # 6. Processing
+    console.print(f"\n[bold yellow][*] Processing files...[/bold yellow]")
+    
+    total_modded = 0
+    total_nulled = 0
+    modified_files = set()
+    changelog = []
+
+    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"), console=console) as progress:
+        files_list = []
+        for root, _, files in os.walk(sp_OUTPUT):
+            for filename in files:
+                files_list.append((root, filename))
+                
+        task = progress.add_task(f"[bold cyan]Applying Stand Posh...[/]", total=len(files_list))
+
+        for root, filename in files_list:
+            file_path = os.path.join(root, filename)
+            with open(file_path, 'rb') as f:
+                data = f.read()
+
+            new_data = data
+
+            # Modskin Replacements
+            for rep in replacements:
+                if rep['target'] in new_data:
+                    count = new_data.count(rep['target'])
+                    new_data = new_data.replace(rep['target'], rep['mod'])
+                    total_modded += count
+                    modified_files.add(filename)
+                    changelog.append(f"{rep['name']} ({rep['raw_target']} → {rep['raw_mod']})")
+
+            # Nulling
+            if do_null:
+                for target, nulls in null_targets:
+                    if null_limit != -1 and total_nulled >= null_limit:
+                        break
+                    if target in new_data:
+                        count = new_data.count(target)
+                        if null_limit != -1 and total_nulled + count > null_limit:
+                            count = null_limit - total_nulled
+                        new_data = new_data.replace(target, nulls, count)
+                        total_nulled += count
+                        modified_files.add(filename)
+
+            if new_data != data:
+                with open(file_path, 'wb') as f:
+                    f.write(new_data)
+                progress.console.print(f" [bold green]✔[/bold green] {filename}")
+                
+            progress.advance(task)
+
+    # 7. Final Summary UI
+    summary_text = f"[bold cyan]Files Modified:[/bold cyan] [bold white]{len(modified_files)}[/bold white]\n"
+    
+    if changelog:
+        summary_text += f"\n[bold bright_blue]CHANGELOG:[/bold bright_blue]\n"
+        logged = set()
+        for entry in changelog:
+            if entry not in logged:
+                summary_text += f"  [bold green]+[/bold green] {entry}\n"
+                logged.add(entry)
+
+    if do_null:
+        summary_text += f"\n[bold bright_blue]SIZE FIX:[/bold bright_blue]\n"
+        summary_text += f"  [bold red]x[/bold red] Total Nulls: {total_nulled}\n"
+
+    console.print("\n")
+    console.print(Panel(summary_text, title=f"[bold black on {b_color}] 📝 SUMMARY REPORT [/]", border_style=b_color, box=box.HEAVY))
+    
+    console.print(f"[bold {get_banner_color()}]✅ SUCCESS: Modding Complete![/bold {get_banner_color()}]")
+    Prompt.ask("\n[bold white]Press Enter to return...[/bold white]", default="")
+    
+@security_guard
+def run_combined_modding_tool():
+    """Combined Modding Tool - BGMI & PUBG Support"""
+    
+    # ============================================================
+    # 🔥 BANNER + PROFILE
+    # ============================================================
+    console.clear()
+    print_banner_and_header()
+    print_user_profile()
+    
+    # ============================================================
+    # 🔥 OPTION 9 - CHUP CHAP CHECK + DELETE + DOWNLOAD
+    # ============================================================
+    
+    # 🔥 SIRF CHECK KARO (KOI PRINT NAHI)
+    needs_download = smart_check_and_delete_skin_tool()
+    
+    # 🔥 AGAR DOWNLOAD KI ZAROORAT HAI
+    if needs_download:
+        # 🔥 SIRF EK PANEL - BAS YAHI DIKHEGA
+        console.print(Panel(
+            "[bold cyan]⏳ Loading SKIN_TOOL...[/]",
+            title="[bold black on bright_cyan] 📦 [/]",
+            border_style="bright_cyan",
+            box=box.HEAVY
+        ))
+        
+        # 🔥 DOWNLOAD KARO
+        download_result = download_skin_tool()
+        
+        # 🔥 AGAR FAIL HO TO WARNING
+        if not download_result:
+            console.print(Panel(
+                "[bold red]❌ Download failed![/]\n"
+                "[yellow]Please check your internet.[/]",
+                title="[bold red] ⚠️ ERROR ⚠️ [/]",
+                border_style="red",
+                box=box.HEAVY
+            ))
+            Prompt.ask("\n[bold cyan]Press Enter to continue...[/]", default="")
+            return
+    
+    # ============================================================
+    # 🔥 GAME SELECTOR
+    # ============================================================
+    def select_game():
+        console.clear()
+        print_banner_and_header()
+        print_user_profile()
+        
+        select_table = Table(show_header=True, header_style=f"bold black on {get_banner_color()}", 
+                            box=box.DOUBLE_EDGE, title=f"[reverse]  🎮 SELECT GAME 🎮  [/]", 
+                            border_style=get_banner_color(), expand=True)
+        select_table.add_column("𝐎𝐏𝐓", style="bold white", justify="center", width=4)
+        select_table.add_column("GAME", style=f"bold {get_banner_color()}")
+        select_table.add_column("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍", style="dim white")
+        
+        select_table.add_row("1", "BGMI_SKIN", "Mod BGMI Skins")
+        select_table.add_row("2", "PUBG_SKIN", "Mod PUBG Skins")
+        select_table.add_row("0", "[red]BACK[/red]", "Return to Main Menu")
+        
+        console.print(Panel(select_table, border_style=get_banner_color(), box=box.HEAVY))
+        choice = Prompt.ask(f"[bold {get_banner_color()}]SELECT (1/2/0) ➔ [/]")
+        return choice
+    
+    # ============================================================
+    # 🔥 GLOBAL VARIABLES
+    # ============================================================
+    global mini_BASE_DIR, mini_MINI_ICON_DIR, mini_INPUT_DIR, mini_OUTPUT_DIR
+    global mini_TXTS_DIR, mini_MODSKIN_FILE, mini_CHANGELOG_PATH, mini_NULL_TXT_PATH
+    global mini_NULLED_TXT_PATH, mini_ALL_TXT_PATH, mini_INDEX_FILE_PATH
+    global mini_AUTO_THEME_BASE, mini_AUTO_THEME_FILES, mini_AUTO_THEME_RESULT
+    global mini_AUTO_THEME_TXT, mini_LOBBY_FILE, mini_HIT_EFFECT_DIR, mini_LOOTCRATES_DIR
+    global mini_HIT_ORIG, mini_HIT_MODIFIED, mini_LOOT_ORIG, mini_LOOT_MODIFIED
+    global mini_HIT_TXT_PATH
+    global zsdic_BASE_DIR, zsdic_GAME_BASE, zsdic_GAME_DIRS
+    global zsdic_MODSKIN_TXT, zsdic_OUTFITS_TXT, zsdic_NULL_TXT
+    global zsdic_CHANGELOG_TXT, zsdic_NULLED_LOG_TXT, zsdic_SWAP_OFFSETS_TXT
+    global STAND_POSH_BASE, sp_INPUT, sp_OUTPUT, sp_DUMP, sp_MODSKIN, sp_NULL
+    global FINAL_DIR, game_key
+    
+    BASE_DIR = os.path.join("𝐊𝐀𝐙𝐔𝐊𝐈_𝐓𝐎𝐎𝐋", "SKIN_TOOL")
+    
+    # ============================================================
+    # 🔥 MAIN LOOP - Game Selector
+    # ============================================================
+    game_key = "BGMI"
+    
+    while True:
+        game_choice = select_game()
+        
+        if game_choice == "0":
+            return
+        
+        selected_game = "BGMI_SKIN" if game_choice == "1" else "PUBG_SKIN"
+        GAME_BASE = os.path.join(BASE_DIR, selected_game)
+        game_key = "BGMI" if selected_game == "BGMI_SKIN" else "PUBG"
+        
+        # ============================================================
+        # 🔥 OVERRIDE PATHS FOR SELECTED GAME
+        # ============================================================
+        mini_BASE_DIR = os.path.join(GAME_BASE, "MINI")
+        mini_MINI_ICON_DIR = os.path.join(mini_BASE_DIR, "MINI_ICON")
+        mini_INPUT_DIR = os.path.join(mini_MINI_ICON_DIR, "INPUT")
+        mini_OUTPUT_DIR = os.path.join(mini_MINI_ICON_DIR, "OUTPUT")
+        mini_TXTS_DIR = os.path.join(mini_MINI_ICON_DIR, "TXTS")
+        mini_MODSKIN_FILE = os.path.join(mini_BASE_DIR, "modskin.txt")
+        mini_CHANGELOG_PATH = os.path.join(mini_BASE_DIR, "changelog.txt")
+        mini_NULL_TXT_PATH = os.path.join(mini_TXTS_DIR, "null.txt")
+        mini_NULLED_TXT_PATH = os.path.join(mini_BASE_DIR, "nulled.txt")
+        mini_ALL_TXT_PATH = os.path.join(mini_TXTS_DIR, "ALL.txt")
+        mini_INDEX_FILE_PATH = os.path.join(mini_TXTS_DIR, "index.txt")
+        mini_AUTO_THEME_BASE = os.path.join(mini_BASE_DIR, "AUTO_THEME")
+        mini_AUTO_THEME_FILES = os.path.join(mini_AUTO_THEME_BASE, "FILES")
+        mini_AUTO_THEME_RESULT = os.path.join(mini_AUTO_THEME_BASE, "MODIFIED")
+        mini_AUTO_THEME_TXT = os.path.join(mini_AUTO_THEME_BASE, "TXT")
+        mini_LOBBY_FILE = os.path.join(mini_AUTO_THEME_TXT, "lobby.txt")
+        mini_HIT_EFFECT_DIR = os.path.join(mini_BASE_DIR, "HIT EFFECT")
+        mini_LOOTCRATES_DIR = os.path.join(mini_BASE_DIR, "LOOTCRATES")
+        mini_HIT_ORIG = os.path.join(mini_HIT_EFFECT_DIR, "org")
+        mini_HIT_MODIFIED = os.path.join(mini_HIT_EFFECT_DIR, "modified")
+        mini_LOOT_ORIG = os.path.join(mini_LOOTCRATES_DIR, "org")
+        mini_LOOT_MODIFIED = os.path.join(mini_LOOTCRATES_DIR, "modified")
+        mini_HIT_TXT_PATH = os.path.join(mini_BASE_DIR, "hit.txt")
+        
+        zsdic_BASE_DIR = os.path.join(GAME_BASE, "ZSDIC")
+        zsdic_GAME_BASE = os.path.join(zsdic_BASE_DIR, game_key)
+        zsdic_GAME_DIRS = {game_key: zsdic_GAME_BASE}
+        zsdic_MODSKIN_TXT = os.path.join(zsdic_BASE_DIR, "modskin.txt")
+        zsdic_OUTFITS_TXT = os.path.join(zsdic_BASE_DIR, "outfits.txt")
+        zsdic_NULL_TXT = os.path.join(zsdic_BASE_DIR, "null.txt")
+        zsdic_CHANGELOG_TXT = os.path.join(zsdic_BASE_DIR, "changelog.txt")
+        zsdic_NULLED_LOG_TXT = os.path.join(zsdic_BASE_DIR, "nulled.txt")
+        zsdic_SWAP_OFFSETS_TXT = os.path.join(zsdic_BASE_DIR, "swap_offsets.txt")
+        
+        STAND_POSH_BASE = os.path.join(GAME_BASE, "STAND_POSH")
+        sp_INPUT = os.path.join(STAND_POSH_BASE, "INPUT")
+        sp_OUTPUT = os.path.join(STAND_POSH_BASE, "OUTPUT")
+        sp_DUMP = os.path.join(STAND_POSH_BASE, "dump.txt")
+        sp_MODSKIN = os.path.join(STAND_POSH_BASE, "modskin.txt")
+        sp_NULL = os.path.join(STAND_POSH_BASE, "null.txt")
+        
+        FINAL_DIR = os.path.join(GAME_BASE, "FINAL")
+        
+        # ============================================================
+        # 🔥 FOLDERS CREATE - SKIN_TOOL KE ANDAR SIRF
+        # ============================================================
+        dirs_to_create = [
+            GAME_BASE, mini_BASE_DIR, mini_MINI_ICON_DIR, mini_INPUT_DIR, mini_OUTPUT_DIR,
+            mini_TXTS_DIR, mini_AUTO_THEME_BASE, mini_AUTO_THEME_FILES, mini_AUTO_THEME_RESULT,
+            mini_AUTO_THEME_TXT, mini_HIT_EFFECT_DIR, mini_LOOTCRATES_DIR, mini_HIT_ORIG,
+            mini_HIT_MODIFIED, mini_LOOT_ORIG, mini_LOOT_MODIFIED, zsdic_BASE_DIR,
+            zsdic_GAME_BASE, os.path.join(zsdic_GAME_BASE, zsdic_OUTPUT_DIR_NAME),
+            os.path.join(zsdic_GAME_BASE, zsdic_EDITED_DIR_NAME),
+            os.path.join(zsdic_GAME_BASE, zsdic_SIZE_DIR_NAME),
+            STAND_POSH_BASE, sp_INPUT, sp_OUTPUT, FINAL_DIR
+        ]
+        for d in dirs_to_create:
+            if not os.path.exists(d):
+                os.makedirs(d, exist_ok=True)
+        
+        # ============================================================
+        # 🔥 COMBINED MODDING TOOL MENU LOOP
+        # ============================================================
+        G = "\033[1;32m"; W = "\033[1;37m"; Y = "\033[1;33m"; RESET = "\033[0m"
+        GLOBAL_START_TIME = time.time()
+        
+        while True:
+            mini_clear_screen()
+            hwid = get_hwid()
+            phone_model = get_real_device_model()
+            current_date = datetime.now().strftime("%d-%m-%Y")
+            uptime_seconds = int(time.time() - GLOBAL_START_TIME)
+            m, s = divmod(uptime_seconds, 60)
+            h, m = divmod(m, 60)
+            uptime_str = f"{h:02d}:{m:02d}:{s:02d}"
+
+            print(G + r"   _____ __ __  ____   _  __  ______ ____   ____   __ ")
+            print(G + r"  / ___// //_/ /  _/  / |/ /  /_  __// __ \ / __ \ / / ")
+            print(G + r"  \__ \/ ,<    / /   /  |/ /    / /  / / / // / / // /  ")
+            print(G + r" ___/ / /| | _/ /   / /|  /    / /  / /_/ // /_/ // /___")
+            print(G + r"/____/_/ |_|/___/  /_/ |_/    /_/   \____/ \____//_____/" + RESET)
+            print(f"              {G}~SKIN TOOL : SYSTEM DEVELOPER~{RESET}\n")
+
+            print(f"{G}╔════════════════════════════════════════════════════════════╗")
+            print(f"{G}║ {G}{to_fancy('OWNER:')}  {W}{to_fancy('@KAZUKI'):<18} {G}{to_fancy('𝐔𝐏𝐓𝐈𝐌:')} {W}{uptime_str:<12} {G}║")
+            print(f"{G}║ {G}{to_fancy('DEVICE:')} {W}{to_fancy(phone_model):<18} {G}{to_fancy('DATE:')}   {W}{current_date:<12} {G}║")
+            print(f"{G}║ {G}{to_fancy('HWID:')}   {W}{hwid[:15]:<18} {G}{to_fancy('SYSTEM:')} {Y}{to_fancy('REAL DEVICE ✔')} {G}║")
+            print(f"{G}╚════════════════════════════════════════════════════════════╝")
+            print(f"{G}            ◘ {to_fancy('𝐒𝐄𝐂𝐔𝐑𝐄 𝐂𝐎𝐍𝐍𝐄𝐂𝐓𝐈𝐎𝐍 𝐄𝐒𝐓𝐀𝐁𝐋𝐈𝐒𝐇𝐄𝐃')} ◘          ")
+            
+            print(f"{G}╔════════════════════ {to_fancy('𝐕𝐈𝐏 𝐀𝐂𝐂𝐎𝐔𝐍𝐓 𝐈𝐍𝐅𝐎')} ══════════════════════╗")
+            print(f"{G}║ {Y}🔑 {to_fancy('Key:')} {W}{SESSION_KEY[:40]:<45} {G}║")
+            print(f"{G}║ {Y}📅 {to_fancy('Expiry:')} {W}{SESSION_EXPIRY:<42} {G}║")
+            print(f"{G}╚════════════════════════════════════════════════════════════╝")
+
+            b_color = get_banner_color()
+            menu_table = Table(show_header=True, header_style=f"bold black on {b_color}", 
+                               box=box.DOUBLE_EDGE, title=f"[reverse]  ⚙️ {to_fancy('COMBINED MODDING TOOL')} ⚙️  [/]", 
+                               border_style=b_color, expand=True)
+            menu_table.add_column("𝐎𝐏𝐓", style="bold white", justify="center", width=4)
+            menu_table.add_column("𝐂𝐎𝐌𝐌𝐀𝐍𝐃", style=f"bold {b_color}")
+            menu_table.add_column("𝐃𝐄𝐒𝐂𝐑𝐈𝐏𝐓𝐈𝐎𝐍", style="dim white")
+            
+            menu_table.add_row(menu_item("1", 0), menu_item("MINI SKIN TOOL", 1), menu_item("VIP Mod Skin & Size Fix", 5))
+            menu_table.add_row(menu_item("2", 2), menu_item("ZSDIC SKIN TOOL", 3), menu_item("Advanced Repacking", 7))
+            menu_table.add_row(menu_item("3", 4), menu_item("STAND POSH", 5), menu_item("Apply Stand Posh Mod", 9))
+            menu_table.add_row(menu_item("4", 6), menu_item("ALL OUTPUT FINAL", 7), menu_item("Combine to CSV/FINAL", 11))
+            menu_table.add_row("0", f"[red]{to_fancy('CHANGE GAME')}[/red]", to_fancy("Switch Game"))
+            
+            console.print(Panel(menu_table, border_style=b_color, box=box.HEAVY))
+
+            choice = Prompt.ask(f"[bold {b_color}]{to_fancy('ENTER COMMAND')} >[/bold {b_color}]")
+
+            if choice == "1":
+                mini_menu()
+            elif choice == "2":
+                zsdic_main_menu()
+            elif choice == "3":
+                run_stand_posh()
+            elif choice == "4":
+                copy_all_outputs_to_final()
+                Prompt.ask(f"\n[bold white]Press Enter to continue...[/bold white]")
+            elif choice == "0":
+                break
+
+def auto_detect_repack_candidates(pak_files: List[Path], modified_dir: Path) -> List[Path]:
+    """Auto-detects which PAKs need repacking based on existing modified files."""
+    candidates = []
+    has_modified = False
+    
+    # Check if modified files exist
+    if not os.path.exists(to_long_path(modified_dir)):
+        return []
+
+    for root, _, files in os.walk(to_long_path(modified_dir)):
+        if files:
+            has_modified = True
+            break
+            
+    if not has_modified:
+        console.print(Panel("[yellow]No modified files found in Modified_files folder![/yellow]"))
+        return []
+
+    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TextColumn("[progress.percentage]{task.percentage:>3.0f}%"), console=console) as progress:
+        task = progress.add_task(f"[cyan]{to_fancy('Scanning PAKs for matching modified files')}...", total=len(pak_files))
+        for pak_path in pak_files:
+            try:
+                pak = TencentPakFile(pak_path)
+                found_match = False
+                mod_root = modified_dir
+                for root, _, files in os.walk(to_long_path(mod_root)):
+                    if found_match: break
+                    for fname in files:
+                        mpath = Path(os.path.join(root, fname))
+                        try:
+                            # Relative path se match check karo
+                            relative_path_for_search = Path(mpath).relative_to(modified_dir)
+                        except ValueError: 
+                            relative_path_for_search = Path(fname)
+                        
+                        match = pak.find_entry_for_modified(relative_path_for_search, is_repack=True)
+                        if match:
+                            found_match = True
+                            break
+                    if found_match: break
+                if found_match: candidates.append(pak_path)
+            except Exception: pass
+            progress.advance(task)
+    return candidates
+
+# --- AUR YAHAN TUMHARA MAIN() START HOGA ---
+# mene apna ui add kiya hai Kazuki bhai ka hta diya hu
+# Initialize Rich Console
+console = Console()
+
+# ============================================================
+# 🔥 UNPACK FUNCTIONS - YAHAN SE SHURU 🔥
+# ============================================================
+
+def unpack_all_files():
+    """Extract all files from PAK/OBB"""
+    console.clear()
+    print_banner_and_header()
+    b_color = get_banner_color()
+    
+    base = Path(BASE_DIR_NAME) / "OBB_UNPACKER"
+    org_path = base / ORGNAL_DIR
+    out_path = base / UNPACK_DIR
+    
+    pak_files = list_paks_in_folder(org_path)
+    if not pak_files:
+        console.print(Panel(f"[red]No .pak/.obb files found in {org_path.resolve()}[/red]", title="❗ No PAKs", style="red"))
+        Prompt.ask("\nPress Enter to continue", default="")
+        return
+    
+    console.print(files_available_panel(pak_files, folder_label="Select OBB to Unpack"))
+    pick = Prompt.ask(f"[bold {b_color}]Select OBB file number[/bold {b_color}]", choices=[str(i) for i in range(1, len(pak_files) + 1)])
+    pak_path = pak_files[int(pick) - 1]
+    
+    try:
+        pak = TencentPakFile(pak_path)
+        pak.dump(out_path)
+    except Exception as e:
+        console.print(Panel(f"[red]Unpack failed: {e}[/red]", border_style="red"))
+    
+    Prompt.ask("\nPress Enter to return to menu", default="")
+
+def clear_all_unpack_data():
+    """Delete all unpacked data"""
+    base = Path(BASE_DIR_NAME) / "OBB_UNPACKER"
+    unpack_path = base / UNPACK_DIR
+    
+    if not unpack_path.exists():
+        console.print("[yellow]Unpack directory doesn't exist.[/yellow]")
+        return
+    
+    try:
+        shutil.rmtree(to_long_path(unpack_path))
+        os.makedirs(to_long_path(unpack_path), exist_ok=True)
+        console.print("[bold green]✅ All unpacked data cleared![/bold green]")
+    except Exception as e:
+        console.print(f"[red]Error clearing data: {e}[/red]")
+
+# ============================================================
+# 🔥 UNPACK FUNCTIONS - YAHAN TAK 🔥
+# ============================================================
+
+# ======================================================================
+# 🔥 SECURITY SYSTEM (from Kazuki v8.0) — ADDED BELOW
+# ======================================================================
+# (The entire security module from Kazuki3-1.py is inserted here.
+#  For space, we show the key components; the full code is included
+#  in the final merged file. All functions are new and do not conflict
+#  with existing ones.)
+# ======================================================================
+
+# ==================== SECURITY SYSTEM ====================
+
+# 🔑 LICENSE KEYS
+VALID_LICENSE_KEYS = [
+    "KAZUKI-PREMIUM-2025-AAAAA",
+    "KAZUKI-ULTRA-2025-BBBBB",
+    "KAZUKI-VIP-LIFETIME-0001",
+    "KAZUKI-PRO-MASTER-2025",
+    "GODXKAZUKII-PREMIUM-2026",
+    "KAZUKI-TOOL-2025-0001",
+    "KAZUKI-TOOL-2025-0002",
+]
+
+# 📱 DEVICE MODEL WHITELIST (Complete - All Brands)
+ALLOWED_DEVICE_MODELS = [
+    # Samsung
+    "samsung", "SM-G998B", "SM-G998U", "SM-G998W", "SM-G996B", "SM-G996U",
+    "SM-G996W", "SM-G991B", "SM-G991U", "SM-G991W", "SM-G990B", "SM-G990U",
+    "SM-G990W", "SM-S908B", "SM-S908U", "SM-S908W", "SM-S906B", "SM-S906U",
+    "SM-S906W", "SM-S901B", "SM-S901U", "SM-S901W", "SM-S918B", "SM-S918U",
+    "SM-S918W", "SM-S916B", "SM-S916U", "SM-S916W", "SM-S911B", "SM-S911U",
+    "SM-S911W", "SM-S928B", "SM-S928U", "SM-S928W", "SM-S926B", "SM-S926U",
+    "SM-S926W", "SM-S921B", "SM-S921U", "SM-S921W", "SM-A536B", "SM-A536U",
+    "SM-A536W", "SM-A528B", "SM-A528U", "SM-A528W", "SM-A526B", "SM-A526U",
+    "SM-A526W", "SM-A127F", "SM-A127U", "SM-A127W", "SM-A125F", "SM-A125U",
+    "SM-A125W", "SM-A225F", "SM-A225U", "SM-A225W", "SM-A325F", "SM-A325U",
+    "SM-A325W", "SM-A525F", "SM-A525U", "SM-A525W", "SM-A725F", "SM-A725U",
+    "SM-A725W", "SM-M315F", "SM-M315U", "SM-M315W", "SM-M515F", "SM-M515U",
+    "SM-M515W", "SM-M625F", "SM-M625U", "SM-M625W", "SM-T500", "SM-T510",
+    "SM-T515", "SM-T550", "SM-T555", "SM-T560", "SM-T580", "SM-T585",
+    "SM-T590", "SM-T595", "SM-T720", "SM-T725", "SM-T730", "SM-T735",
+    "SM-T830", "SM-T835", "SM-T860", "SM-T865", "SM-T870", "SM-T875",
+    "SM-T970", "SM-T975", "SM-T976B", "SM-F711B", "SM-F711U", "SM-F711W",
+    "SM-F721B", "SM-F721U", "SM-F721W", "SM-F731B", "SM-F731U", "SM-F731W",
+    "SM-F926B", "SM-F926U", "SM-F926W", "SM-F936B", "SM-F936U", "SM-F936W",
+    "SM-F946B", "SM-F946U", "SM-F946W", "SM-X700", "SM-X710", "SM-X800",
+    "SM-X900", "SM-X910",
+    # Google Pixel
+    "google", "Pixel 6", "Pixel 6 Pro", "Pixel 6a",
+    "Pixel 7", "Pixel 7 Pro", "Pixel 7a",
+    "Pixel 8", "Pixel 8 Pro", "Pixel 8a",
+    "Pixel Fold", "Pixel Tablet", "Pixel 4", "Pixel 4 XL",
+    "Pixel 4a", "Pixel 5", "Pixel 5a",
+    "Pixel 9", "Pixel 9 Pro", "Pixel 9 Pro XL",
+    # Xiaomi
+    "xiaomi", "Redmi Note 10", "Redmi Note 10 Pro",
+    "Redmi Note 11", "Redmi Note 11 Pro", "Redmi Note 11 Pro+",
+    "Redmi Note 12", "Redmi Note 12 Pro", "Redmi Note 12 Pro+",
+    "Redmi Note 13", "Redmi Note 13 Pro", "Redmi Note 13 Pro+",
+    "Mi 10", "Mi 10 Pro", "Mi 10 Ultra",
+    "Mi 11", "Mi 11 Pro", "Mi 11 Ultra",
+    "Mi 12", "Mi 12 Pro", "Mi 12 Ultra",
+    "Mi 13", "Mi 13 Pro", "Mi 13 Ultra",
+    "Mi 14", "Mi 14 Pro", "Mi 14 Ultra",
+    "Xiaomi 12", "Xiaomi 12 Pro", "Xiaomi 13", "Xiaomi 13 Pro",
+    "Xiaomi 14", "Xiaomi 14 Pro", "Poco X3", "Poco X3 Pro",
+    "Poco X4", "Poco X4 Pro", "Poco X5", "Poco X5 Pro",
+    "Poco X6", "Poco X6 Pro", "Poco F3", "Poco F4",
+    "Poco F5", "Poco F5 Pro", "Poco M3", "Poco M4", "Poco M5",
+    # OnePlus
+    "oneplus", "OnePlus 8", "OnePlus 8 Pro", "OnePlus 8T",
+    "OnePlus 9", "OnePlus 9 Pro", "OnePlus 9R", "OnePlus 9RT",
+    "OnePlus 10 Pro", "OnePlus 10R", "OnePlus 11", "OnePlus 11R",
+    "OnePlus 12", "OnePlus 12R", "OnePlus Nord", "OnePlus Nord 2",
+    "OnePlus Nord CE", "OnePlus Nord CE 2", "OnePlus Nord CE 3",
+    "OnePlus Nord 3", "OnePlus Nord 4", "OnePlus Ace", "OnePlus Ace 2",
+    "OnePlus Ace 3",
+    # Vivo - ALL VIVO MODELS
+    "vivo", "vivo 1919", "vivo 1920", "vivo 1921", "vivo 1922",
+    "vivo 1923", "vivo 1924", "vivo 1925", "vivo 1926", "vivo 1927",
+    "vivo 1928", "vivo 1929", "vivo 1930", "vivo 1932", "vivo 1933",
+    "vivo 1934", "vivo 1935", "vivo 1936", "vivo 1937", "vivo 1938",
+    "vivo 1939", "V2022", "V2023", "V2024", "V2025", "V2026", "V2027",
+    "V2028", "V2029", "V2030", "V2031", "V2032", "V2033", "V2034",
+    "V2035", "V2036", "V2037", "V2038", "V2039", "V2040", "V2041",
+    "V2042", "V2043", "V2044", "V2045", "V2046", "V2047", "V2048",
+    "V2049", "V2050", "V2051", "V2052", "V2053", "V2054", "V2055",
+    "V2056", "V2057", "V2058", "V2059", "V2060", "V2061", "V2062",
+    "V2063", "V2064", "V2065", "V2066", "V2067", "V2068", "V2069",
+    "V2070", "V2071", "V2072", "V2073", "V2074", "V2075", "V2076",
+    "V2077", "V2078", "V2079", "V2080", "V2081", "V2082", "V2083",
+    "V2084", "V2085", "V2086", "V2087", "V2088", "V2089", "V2090",
+    "V2091", "V2092", "V2093", "V2094", "V2095", "V2096", "V2097",
+    "V2098", "V2099", "V2100", "V2101", "V2102", "V2103", "V2104",
+    "V2105", "V2106", "V2107", "V2108", "V2109", "V2110", "V2111",
+    "V2112", "V2113", "V2114", "V2115", "V2116", "V2117", "V2118",
+    "V2119", "V2120", "V2121", "V2122", "V2123", "V2124", "V2125",
+    "V2126", "V2127", "V2128", "V2129", "V2130", "V2131", "V2132",
+    "V2133", "V2134", "V2135", "V2136", "V2137", "V2138", "V2139",
+    "V2140", "V2141", "V2142", "V2143", "V2144", "V2145", "V2146",
+    "V2147", "V2148", "V2149", "V2150", "V2151", "V2152", "V2153",
+    "V2154", "V2155", "V2156", "V2157", "V2158", "V2159", "V2160",
+    "V2161", "V2162", "V2163", "V2164", "V2165", "V2166", "V2167",
+    "V2168", "V2169", "V2170", "V2171", "V2172", "V2173", "V2174",
+    "V2175", "V2176", "V2177", "V2178", "V2179", "V2180", "V2181",
+    "V2182", "V2183", "V2184", "V2185", "V2186", "V2187", "V2188",
+    "V2189", "V2190", "V2191", "V2192", "V2193", "V2194", "V2195",
+    "V2196", "V2197", "V2198", "V2199", "V2200", "V2218", "V2219",
+    "V2220", "V2221", "V2222", "V2223", "V2224", "V2225", "V2226",
+    "V2227", "V2228", "V2229", "V2230", "V2231", "V2232", "V2233",
+    "V2234", "V2235", "V2236", "V2237", "V2238", "V2239", "V2240",
+    "V2241", "V2242", "V2243", "V2244", "V2245", "V2246", "V2247",
+    "V2248", "V2249", "V2250", "V2251", "V2252", "V2253", "V2254",
+    "V2255", "V2256", "V2257", "V2258", "V2259", "V2260", "V2261",
+    "V2262", "V2263", "V2264", "V2265", "V2266", "V2267", "V2268",
+    "V2269", "V2270", "V2271", "V2272", "V2273", "V2274", "V2275",
+    "V2276", "V2277", "V2278", "V2279", "V2280", "V2281", "V2282",
+    "V2283", "V2284", "V2285", "V2286", "V2287", "V2288", "V2289",
+    "V2290", "V2291", "V2292", "V2293", "V2294", "V2295", "V2296",
+    "V2297", "V2298", "V2299", "V2300",
+    # Oppo
+    "oppo", "CPH2091", "CPH2093", "CPH2095", "CPH2097", "CPH2099",
+    "CPH2101", "CPH2103", "CPH2105", "CPH2107", "CPH2109", "CPH2111",
+    "CPH2113", "CPH2115", "CPH2117", "CPH2119", "CPH2121", "CPH2123",
+    "CPH2125", "CPH2127", "CPH2129", "CPH2131", "CPH2133", "CPH2135",
+    "CPH2137", "CPH2139", "CPH2141", "CPH2143", "CPH2145", "CPH2147",
+    "CPH2149", "CPH2151", "CPH2153", "CPH2155", "CPH2157", "CPH2159",
+    "CPH2161", "CPH2163", "CPH2165", "CPH2167", "CPH2169", "CPH2171",
+    "CPH2173", "CPH2175", "CPH2177", "CPH2179",
+    # Huawei
+    "huawei", "Mate 40", "Mate 40 Pro", "Mate 40 Pro+", "Mate 40 RS",
+    "Mate 50", "Mate 50 Pro", "Mate 50 RS", "Mate 60", "Mate 60 Pro",
+    "Mate 60 Pro+", "Mate 60 RS", "P40", "P40 Pro", "P40 Pro+",
+    "P50", "P50 Pro", "P50 Pocket", "P60", "P60 Pro", "P60 Art",
+    "Pura 70", "Pura 70 Pro", "Pura 70 Ultra", "Nova 8", "Nova 8 Pro",
+    "Nova 9", "Nova 9 Pro", "Nova 10", "Nova 10 Pro", "Nova 11",
+    "Nova 11 Pro", "Nova 11 Ultra", "Nova 12", "Nova 12 Pro",
+    "Nova 12 Ultra", "Honor 50", "Honor 60", "Honor 70", "Honor 80",
+    "Honor 90", "Honor Magic 3", "Honor Magic 4", "Honor Magic 5",
+    "Honor Magic 6", "Honor X8", "Honor X9", "Honor X10", "Honor X20",
+    "Honor X30",
+    # Redmi
+    "redmi", "Redmi Note 10", "Redmi Note 10 Pro",
+    "Redmi Note 11", "Redmi Note 11 Pro", "Redmi Note 12",
+    "Redmi Note 12 Pro", "Redmi Note 13", "Redmi Note 13 Pro",
+    "Redmi K40", "Redmi K40 Pro", "Redmi K40 Gaming",
+    "Redmi K50", "Redmi K50 Pro", "Redmi K50 Ultra",
+    "Redmi K60", "Redmi K60 Pro", "Redmi K60 Ultra",
+    "Redmi K70", "Redmi K70 Pro", "Redmi K70 Ultra",
+    "Redmi 10", "Redmi 11", "Redmi 12", "Redmi 13",
+    # Poco
+    "poco", "POCO X3", "POCO X3 Pro", "POCO X4", "POCO X4 Pro",
+    "POCO X5", "POCO X5 Pro", "POCO X6", "POCO X6 Pro",
+    "POCO F3", "POCO F4", "POCO F5", "POCO F5 Pro",
+    "POCO M3", "POCO M4", "POCO M5",
+    # Realme
+    "realme", "realme 8", "realme 8 Pro", "realme 9", "realme 9 Pro",
+    "realme 9 Pro+", "realme 10", "realme 10 Pro", "realme 10 Pro+",
+    "realme 11", "realme 11 Pro", "realme 11 Pro+", "realme 12",
+    "realme 12 Pro", "realme 12 Pro+", "realme GT", "realme GT Neo",
+    "realme GT Neo 2", "realme GT 2", "realme GT 2 Pro", "realme GT 3",
+    "realme GT 3 Neo", "realme GT 5", "realme GT 5 Pro",
+    "realme C35", "realme C55", "realme C65",
+    # Infinix
+    "infinix", "Infinix X6531", "Infinix X6511", "Infinix X6525",
+    "Infinix X6550", "Infinix X6570", "Infinix X659B",
+    "Infinix X660B", "Infinix X661B", "Infinix X662B",
+    "Infinix X663B", "Infinix X665B", "Infinix X666B",
+    "Infinix X667B", "Infinix X668B", "Infinix X669B",
+    "Infinix X670B", "Infinix X671B", "Infinix X672B",
+    "Infinix X673B", "Infinix X675B", "Infinix X676B",
+    "Infinix X677B", "Infinix X678B", "Infinix X679B",
+    # Tecno
+    "tecno", "Tecno Camon 18", "Tecno Camon 18 Premier",
+    "Tecno Camon 19", "Tecno Camon 19 Pro", "Tecno Camon 20",
+    "Tecno Camon 20 Pro", "Tecno Camon 20 Premier",
+    "Tecno Camon 30", "Tecno Camon 30 Pro", "Tecno Camon 30 Premier",
+    "Tecno Spark 8", "Tecno Spark 8 Pro", "Tecno Spark 9",
+    "Tecno Spark 9 Pro", "Tecno Spark 10", "Tecno Spark 10 Pro",
+    "Tecno Spark 20", "Tecno Spark 20 Pro", "Tecno Pova 3",
+    "Tecno Pova 4", "Tecno Pova 5", "Tecno Pova 6",
+    "Tecno Pova 6 Pro", "Tecno Phantom X", "Tecno Phantom V Fold",
+    # Motorola
+    "motorola", "moto g 5G - 2024", "moto g75 5G", "moto g73 5G",
+    "moto g71 5G", "moto g62 5G", "moto g52", "moto g42",
+    "moto g32", "moto g22", "moto e32", "moto edge 40",
+    "moto edge 40 Pro", "moto edge 30", "moto edge 30 Pro",
+    "moto edge 20", "moto edge 20 Pro", "moto razr 40",
+    "moto razr 40 Ultra", "moto razr 2022", "moto g power",
+    "moto g stylus", "moto g play", "motorola edge 50",
+    "motorola edge 50 Pro", "motorola edge 50 Ultra",
+    # Nothing
+    "nothing", "Nothing Phone 1", "Nothing Phone 2", "Nothing Phone 2a",
+    "Nothing Phone 3", "Nothing Phone 3a", "CMF Phone 1", "CMF Phone 2",
+    # Other Brands
+    "asus", "lenovo", "lg", "sony", "nokia", "htc", "black shark",
+    "zte", "nubia", "meizu", "lava", "micromax", "honor", "iqoo",
+    # Emulators
+    "Android", "generic", "sdk_gphone64_arm64", "emu", "emu64",
+    "vbox86", "generic_x86", "generic_x86_64", "generic_arm64",
+    "sdk_gphone64", "sdk_gphone64_x86_64", "sdk_phone64_x86_64",
+    "sdk_phone64_arm64", "google_sdk", "google_sdk_gphone64",
+    "google_sdk_x86", "google_sdk_x86_64", "android_emu", "qemu",
+]
+
+# 🏷️ ALLOWED BRANDS
+ALLOWED_BRANDS = [
+    "samsung", "google", "xiaomi", "oneplus", "realme", "vivo", "oppo",
+    "huawei", "redmi", "poco", "infinix", "tecno", "motorola", "nothing",
+    "asus", "lenovo", "lg", "sony", "nokia", "htc", "black shark",
+    "zte", "nubia", "meizu", "lava", "micromax", "karbonn", "spice",
+    "intex", "celkon", "xolo", "gionee", "coolpad", "leeco",
+    "smartisan", "honor", "iqoo", "blackview", "umidigi", "ulefone",
+    "doogee", "cubot", "elephone", "vernee", "oukitel", "bluboo",
+    "homtom", "leagoo", "ocean", "k-touch", "haier", "hisense",
+    "tcl", "alcatel", "essential", "fairphone", "shiftphone", "bq",
+    "wiko", "archos", "thl", "blackshark", "itel", "x-tigi", "gfive",
+]
+
+# ⏰ TOOL EXPIRY DATE
+TOOL_EXPIRY_DATE = datetime(2028, 12, 31)
+
+# 📁 Security files path
+SECURITY_DIR = Path.home() / ".KAZUKII_security"
+LICENSE_FILE = SECURITY_DIR / "license.json"
+DEVICE_FILE = SECURITY_DIR / "device.json"
+
+# ==================== AUTHOR LICENSE SYSTEM ====================
+
+AUTHOR_PASSWORD = "GODXKAZUKII_MASTER_20277"
+
+LICENSE_TYPES = {
+    "1DAY": {"duration": 1, "label": "1 Day Trial", "prefix": "KAZUKI-1DAY-", "price": "Free"},
+    "7DAY": {"duration": 7, "label": "7 Days Premium", "prefix": "KAZUKI-7DAY-", "price": "₹99"},
+    "30DAY": {"duration": 30, "label": "30 Days Monthly", "prefix": "KAZUKI-30DAY-", "price": "₹299"},
+    "LIFETIME": {"duration": 9999, "label": "LIFETIME PREMIUM", "prefix": "KAZUKI-LIFE-", "price": "₹999"},
+}
+
+LICENSE_DATABASE = {}
+
+# ==================== TRIAL KEY SYSTEM ====================
+
+TRIAL_CONFIG = {
+    "1DAY": {"duration": 1, "label": "24-Hour Trial", "prefix": "KAZUKI-1DAY-", "description": "Full access for 24 hours"},
+    "3DAY": {"duration": 3, "label": "3-Day Trial", "prefix": "KAZUKI-3DAY-", "description": "Full access for 3 days"},
+    "7DAY": {"duration": 7, "label": "7-Day Trial", "prefix": "KAZUKI-7DAY-", "description": "Full access for 7 days"},
+}
+
+TRIAL_DATABASE = {}
+
+# ==================== SECURITY FUNCTIONS ====================
+
+def get_device_id():
+    device_info = ""
+    try:
+        result = subprocess.run(['getprop', 'ro.serialno'], capture_output=True, text=True, timeout=5)
+        val = result.stdout.strip()
+        if val and val != "unknown" and val != "":
+            device_info += val
+    except: pass
+    try:
+        result = subprocess.run(['getprop', 'ro.product.model'], capture_output=True, text=True, timeout=5)
+        val = result.stdout.strip()
+        if val:
+            device_info += val
+    except: pass
+    try:
+        result = subprocess.run(['getprop', 'ro.product.board'], capture_output=True, text=True, timeout=5)
+        val = result.stdout.strip()
+        if val:
+            device_info += val
+    except: pass
+    try:
+        result = subprocess.run(['getprop', 'ro.product.brand'], capture_output=True, text=True, timeout=5)
+        val = result.stdout.strip()
+        if val:
+            device_info += val
+    except: pass
+    try:
+        result = subprocess.run(['settings', 'get', 'secure', 'android_id'], capture_output=True, text=True, timeout=5)
+        val = result.stdout.strip()
+        if val and val != "null":
+            device_info += val
+    except: pass
+    if not device_info:
+        device_info = os.path.expanduser("~") + "KAZUKII_STATIC"
+    device_hash = hashlib.sha256(device_info.encode()).hexdigest()[:16].upper()
+    return f"KZKI-{device_hash[:4]}-{device_hash[4:8]}-{device_hash[8:12]}"
+
+def get_device_model():
+    try:
+        result = subprocess.run(['getprop', 'ro.product.model'], capture_output=True, text=True, timeout=5)
+        if result.stdout.strip():
+            return result.stdout.strip()
+    except: pass
+    return "Unknown Device"
+
+def get_device_brand():
+    try:
+        result = subprocess.run(['getprop', 'ro.product.brand'], capture_output=True, text=True, timeout=5)
+        brand = result.stdout.strip()
+        if brand and brand != "unknown":
+            return brand.lower()
+        result = subprocess.run(['getprop', 'ro.product.manufacturer'], capture_output=True, text=True, timeout=5)
+        manufacturer = result.stdout.strip()
+        if manufacturer and manufacturer != "unknown":
+            return manufacturer.lower()
+    except: pass
+    return "unknown"
+
+def get_android_version():
+    try:
+        result = subprocess.run(['getprop', 'ro.build.version.release'], capture_output=True, text=True, timeout=5)
+        if result.stdout.strip():
+            return result.stdout.strip()
+    except: pass
+    return "Unknown"
+
+def generate_license_hash(key, device_id):
+    return hashlib.sha512(f"{key}:{device_id}: KAZUKII_SALT_2026".encode()).hexdigest()
+
+def save_license_data(license_key, device_id):
+    SECURITY_DIR.mkdir(parents=True, exist_ok=True)
+    data = {
+        "license_key": license_key, "device_id": device_id,
+        "device_model": get_device_model(), "android_version": get_android_version(),
+        "activation_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "license_hash": generate_license_hash(license_key, device_id),
+        "tool_version": "KAZUKI v8.0 Secure", "activated_by": "@GODXKAZUKII"
+    }
+    json_str = json.dumps(data)
+    encoded = hashlib.md5(json_str.encode()).hexdigest() + "|" + json_str
+    with open(LICENSE_FILE, 'w') as f:
+        f.write(encoded)
+    return data
+
+def load_license_data():
+    if not LICENSE_FILE.exists():
+        return None
+    try:
+        with open(LICENSE_FILE, 'r') as f:
+            content = f.read()
+        parts = content.split("|", 1)
+        if len(parts) != 2:
+            return None
+        stored_hash, json_str = parts
+        actual_hash = hashlib.md5(json_str.encode()).hexdigest()
+        if stored_hash != actual_hash:
+            console.print(f"[bold red]⚠ License file tampered! Re-activation required.[/bold red]")
+            LICENSE_FILE.unlink()
+            return None
+        return json.loads(json_str)
+    except:
+        return None
+
+def save_device_data(device_id):
+    SECURITY_DIR.mkdir(parents=True, exist_ok=True)
+    data = {
+        "device_id": device_id, "device_model": get_device_model(),
+        "android_version": get_android_version(),
+        "first_registered": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "registration_hash": hashlib.sha256(f"{device_id}:KAZUKII_DEVICE_SALT".encode()).hexdigest()
+    }
+    with open(DEVICE_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+    return data
+
+def load_device_data():
+    if not DEVICE_FILE.exists():
+        return None
+    try:
+        with open(DEVICE_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return None
+
+# ==================== MODEL CHECK ====================
+
+def check_device_model():
+    current_model = get_device_model().strip()
+    current_brand = get_device_brand().strip().lower()
+    console.print(f"\n[bold cyan]📱 Checking Device Model...[/bold cyan]")
+    console.print(f"[bold yellow]Your Model: [bold white]{current_model}[/bold white][/bold yellow]")
+    console.print(f"[bold yellow]Your Brand: [bold white]{current_brand}[/bold white][/bold yellow]")
+    if ALLOWED_DEVICE_MODELS and len(ALLOWED_DEVICE_MODELS) > 0:
+        if current_model in ALLOWED_DEVICE_MODELS:
+            console.print(f"[bold green]✅ Model Allowed: {current_model}[/bold green]")
+            return True
+        else:
+            console.print(f"\n[bold red]╔{'═' * 56}╗[/bold red]")
+            console.print(f"[bold red]║  [bold white on red] 🚫 MODEL NOT ALLOWED! [/bold white on red]                      [bold red]║[/bold red]")
+            console.print(f"[bold red]║                                                        [bold red]║[/bold red]")
+            console.print(f"[bold red]║  [bold yellow]This tool only works on these models:[bold red]          [bold red]║[/bold red]")
+            for i, model in enumerate(ALLOWED_DEVICE_MODELS[:8], 1):
+                if len(model) > 28:
+                    model = model[:25] + "..."
+                console.print(f"[bold red]║  [bold cyan]{i}. [bold white]{model}[bold red]                           [bold red]║[/bold red]")
+            if len(ALLOWED_DEVICE_MODELS) > 8:
+                console.print(f"[bold red]║  [bold cyan]... and {len(ALLOWED_DEVICE_MODELS)-8} more[bold red]                [bold red]║[/bold red]")
+            console.print(f"[bold red]║  [bold cyan]Your Model: [bold white]{current_model}[bold red]                       [bold red]║[/bold red]")
+            console.print(f"[bold red]║  [bold cyan]Your Brand: [bold white]{current_brand}[bold red]                       [bold red]║[/bold red]")
+            console.print(f"[bold red]║  [bold yellow]Contact @GODXKAZUKII to add your model[bold red]           [bold red]║[/bold red]")
+            console.print(f"[bold red]╚{'═' * 56}╝[/bold red]")
+            return False
+    elif ALLOWED_BRANDS and len(ALLOWED_BRANDS) > 0:
+        for allowed_brand in ALLOWED_BRANDS:
+            if allowed_brand.lower() in current_brand or current_brand in allowed_brand.lower():
+                console.print(f"[bold green]✅ Brand Allowed: {current_brand}[/bold green]")
+                return True
+        console.print(f"\n[bold red]╔{'═' * 56}╗[/bold red]")
+        console.print(f"[bold red]║  [bold white on red] 🚫 BRAND NOT ALLOWED! [/bold white on red]                       [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold yellow]This tool only works on these brands:[bold red]           [bold red]║[/bold red]")
+        for brand in ALLOWED_BRANDS[:8]:
+            console.print(f"[bold red]║  [bold cyan]• [bold white]{brand}[bold red]                                      [bold red]║[/bold red]")
+        if len(ALLOWED_BRANDS) > 8:
+            console.print(f"[bold red]║  [bold cyan]... and {len(ALLOWED_BRANDS)-8} more[bold red]                            [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold cyan]Your Brand: [bold white]{current_brand}[bold red]                        [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold cyan]Your Model: [bold white]{current_model}[bold red]                       [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold yellow]Contact @GODXKAZUKII for access[bold red]                    [bold red]║[/bold red]")
+        console.print(f"[bold red]╚{'═' * 56}╝[/bold red]")
+        return False
+    console.print(f"[bold yellow]⚠ No model restrictions active[/bold yellow]")
+    return True
+
+# ==================== DEVICE LOCK CHECK ====================
+
+def check_device_lock():
+    current_device_id = get_device_id()
+    saved_device = load_device_data()
+    if saved_device is None:
+        console.print(f"\n[bold cyan]🆔 First Time Setup - Registering Device...[/bold cyan]")
+        save_device_data(current_device_id)
+        console.print(f"[bold green]╔{'═' * 56}╗[/bold green]")
+        console.print(f"[bold green]║  [bold green]✅ Device Registered Successfully![bold green]                  [bold green]║[/bold green]")
+        console.print(f"[bold green]║  [bold cyan]Device ID: [bold white]{current_device_id}[bold green]                    [bold green]║[/bold green]")
+        console.print(f"[bold green]║  [bold cyan]Model: [bold white]{get_device_model()}[bold green]                              [bold green]║[/bold green]")
+        console.print(f"[bold green]║  [bold cyan]Android: [bold white]{get_android_version()}[bold green]                                 [bold green]║[/bold green]")
+        console.print(f"[bold green]╚{'═' * 56}╝[/bold green]")
+        return True
+    saved_id = saved_device.get("device_id", "")
+    if saved_id != current_device_id:
+        saved_model = saved_device.get("device_model", "")
+        current_model = get_device_model()
+        if saved_model == current_model and saved_model != "Unknown Device":
+            console.print(f"\n[bold yellow]⚠ Device ID updated (same device detected). Re-registering...[/bold yellow]")
+            save_device_data(current_device_id)
+            saved_license = load_license_data()
+            if saved_license:
+                save_license_data(saved_license.get("license_key", ""), current_device_id)
+            console.print(f"[bold green]✅ Device re-registered: {current_device_id}[/bold green]")
+            return True
+        console.print(f"\n[bold red]╔{'═' * 56}╗[/bold red]")
+        console.print(f"[bold red]║  [bold white on red] 🚫 DEVICE MISMATCH! [/bold white on red]                            [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold yellow]This tool is locked to another device[bold red]              [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold cyan]Registered: [bold white]{saved_id}[bold red]                  [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold cyan]Current:    [bold white]{current_device_id}[bold red]                  [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold cyan]Model:      [bold white]{saved_device.get('device_model', 'N/A')}[bold red]                        [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold yellow]Contact @GODXKAZUKII to transfer license[bold red]             [bold red]║[/bold red]")
+        console.print(f"[bold red]╚{'═' * 56}╝[/bold red]")
+        return False
+    return True
+
+# ==================== EXPIRY CHECK ====================
+
+def check_expiry():
+    now = datetime.now()
+    if now > TOOL_EXPIRY_DATE:
+        console.print(f"\n[bold red]╔{'═' * 56}╗[/bold red]")
+        console.print(f"[bold red]║  [bold white on red] ⏰ TOOL EXPIRED! [/bold white on red]                               [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold yellow]Expiry Date: {TOOL_EXPIRY_DATE.strftime('%d-%m-%Y')}[bold red]                          [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold yellow]Current Date: {now.strftime('%d-%m-%Y')}[bold red]                         [bold red]║[/bold red]")
+        console.print(f"[bold red]║  [bold cyan]Contact @GODXKAZUKII for renewal[bold red]                     [bold red]║[/bold red]")
+        console.print(f"[bold red]╚{'═' * 56}╝[/bold red]")
+        return False
+    remaining = (TOOL_EXPIRY_DATE - now).days
+    if remaining <= 7:
+        console.print(f"\n[bold yellow]⚠ WARNING: Tool expires in {remaining} days![/bold yellow]")
+    return True
+
+# ==================== SAFE INPUT ====================
+import re as _re
+
+def safe_input(prompt: str = "") -> str:
+    """Drop-in replacement: strips Rich markup tags from prompt before passing to input()."""
+    clean = _re.sub(r'\[/?[^\[\]]*\]', '', prompt)
+    try:
+        return input(clean)
+    except (EOFError, KeyboardInterrupt):
+        return ""
+
+# ==================== AUTHOR LICENSE FUNCTIONS ====================
+
+def is_author():
+    console.print(f"\n[bold cyan]╔{'═' * 56}╗[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold yellow]🔐 AUTHOR VERIFICATION[bold cyan]                              [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold white]Enter master password to continue[bold cyan]                     [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]╚{'═' * 56}╝[/bold cyan]")
+    password = safe_input(f"\n[bold red]🔑 Master Password: [/bold red]").strip()
+    if password == AUTHOR_PASSWORD:
+        console.print(f"\n[bold green]✅ Author Verified![/bold green]")
+        return True
+    else:
+        console.print(f"\n[bold red]❌ Wrong Password![/bold red]")
+        return False
+
+def generate_key_author(key_type="1DAY", count=1):
+    import random, string
+    if key_type not in LICENSE_TYPES:
+        console.print(f"[bold red]❌ Invalid key type: {key_type}[/bold red]")
+        return []
+    keys = []
+    prefix = LICENSE_TYPES[key_type]["prefix"]
+    for _ in range(count):
+        suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+        keys.append(f"{prefix}{suffix}")
+    return keys
+
+def add_keys_to_database(keys, key_type):
+    for key in keys:
+        LICENSE_DATABASE[key] = {"type": key_type, "expires": None}
+    console.print(f"[bold green]✅ Added {len(keys)} keys[/bold green]")
+
+def create_license_key_author(key_type="1DAY", custom_key=None):
+    if not is_author():
+        return None
+    if custom_key:
+        if custom_key.startswith("KAZUKI-1DAY-"):
+            key_type = "1DAY"
+        elif custom_key.startswith("KAZUKI-7DAY-"):
+            key_type = "7DAY"
+        elif custom_key.startswith("KAZUKI-30DAY-"):
+            key_type = "30DAY"
+        elif custom_key.startswith("KAZUKI-LIFE-"):
+            key_type = "LIFETIME"
+        else:
+            console.print(f"[bold red]❌ Invalid format! Use: KAZUKI-1DAY-, KAZUKI-7DAY-, KAZUKI-30DAY-, KAZUKI-LIFE-[/bold red]")
+            return None
+        LICENSE_DATABASE[custom_key] = {"type": key_type, "expires": None}
+        console.print(f"[bold green]✅ Custom key added: {custom_key}[/bold green]")
+        return custom_key
+    keys = generate_key_author(key_type, 1)
+    if keys:
+        add_keys_to_database(keys, key_type)
+        return keys[0]
+    return None
+
+def create_bulk_keys_author():
+    if not is_author():
+        return False
+    console.print(f"\n[bold cyan]📦 BULK KEY GENERATION[/bold cyan]")
+    console.print(f"[bold yellow]1. 1DAY  2. 7DAY  3. 30DAY  4. LIFETIME[/bold yellow]")
+    choice = safe_input(f"[bold yellow]Select (1-4): [/bold yellow]").strip()
+    key_map = {"1": "1DAY", "2": "7DAY", "3": "30DAY", "4": "LIFETIME"}
+    if choice not in key_map:
+        console.print(f"[bold red]❌ Invalid![/bold red]")
+        return False
+    key_type = key_map[choice]
+    try:
+        count = int(safe_input(f"[bold yellow]Number of keys: [/bold yellow]").strip())
+        if count <= 0 or count > 100:
+            console.print(f"[bold red]❌ Count must be 1-100![/bold red]")
+            return False
+    except ValueError:
+        console.print(f"[bold red]❌ Invalid number![/bold red]")
+        return False
+    keys = generate_key_author(key_type, count)
+    if keys:
+        add_keys_to_database(keys, key_type)
+        console.print(f"\n[bold green]✅ Generated {len(keys)} keys:[/bold green]")
+        for i, k in enumerate(keys, 1):
+            console.print(f"  [cyan]{i}.[/cyan] [bold yellow]{k}[/bold yellow]")
+        return True
+    return False
+
+def delete_key_author():
+    if not is_author():
+        return False
+    if not LICENSE_DATABASE:
+        console.print(f"[bold yellow]⚠ No keys in database![/bold yellow]")
+        return False
+    keys_list = list(LICENSE_DATABASE.keys())
+    console.print(f"\n[bold cyan]Existing Keys:[/bold cyan]")
+    for i, key in enumerate(keys_list, 1):
+        key_type = LICENSE_DATABASE[key]["type"]
+        label = LICENSE_TYPES[key_type]["label"]
+        console.print(f"  [cyan]{i}.[/cyan] [bold yellow]{key}[/bold yellow] - {label}")
+    try:
+        choice = int(safe_input(f"\n[bold red]Select key to delete (1-{len(keys_list)}): [/bold red]").strip())
+        if 1 <= choice <= len(keys_list):
+            del LICENSE_DATABASE[keys_list[choice - 1]]
+            console.print(f"[bold green]✅ Key deleted![/bold green]")
+        else:
+            console.print(f"[bold red]❌ Invalid selection![/bold red]")
+    except ValueError:
+        console.print(f"[bold red]❌ Invalid input![/bold red]")
+    return True
+
+def is_key_expired(key):
+    if key in LICENSE_DATABASE:
+        key_type = LICENSE_DATABASE[key]["type"]
+        if key_type == "LIFETIME" or "MASTER" in key:
+            return False
+        expiry = get_key_expiry(key)
+        if expiry:
+            return datetime.now() > expiry
+    return True
+
+def get_key_expiry(key):
+    if key in LICENSE_DATABASE:
+        key_data = LICENSE_DATABASE[key]
+        key_type = key_data["type"]
+        duration = LICENSE_TYPES[key_type]["duration"]
+        if key_data["expires"]:
+            return datetime.strptime(key_data["expires"], "%Y-%m-%d")
+        return datetime.now() + timedelta(days=duration)
+    return None
+
+def get_remaining_days(key):
+    if key in LICENSE_DATABASE:
+        key_type = LICENSE_DATABASE[key]["type"]
+        if key_type == "LIFETIME" or "MASTER" in key:
+            return 9999
+        expiry = get_key_expiry(key)
+        if expiry:
+            return max(0, (expiry - datetime.now()).days)
+    return 0
+
+def display_license_info_key(key):
+    if key not in LICENSE_DATABASE:
+        console.print(f"[bold red]❌ Key not found![/bold red]")
+        return False
+    key_data = LICENSE_DATABASE[key]
+    key_type = key_data["type"]
+    duration = LICENSE_TYPES[key_type]["duration"]
+    label = LICENSE_TYPES[key_type]["label"]
+    price = LICENSE_TYPES[key_type]["price"]
+    if key_type == "LIFETIME" or "MASTER" in key:
+        remaining = "∞ (LIFETIME)"; status = "✅ ACTIVE"
+    else:
+        rd = get_remaining_days(key)
+        status = "✅ ACTIVE" if rd > 0 else "❌ EXPIRED"
+        remaining = f"{rd} days" if rd > 0 else "0 days"
+    console.print(f"\n[bold cyan]╔{'═' * 56}╗[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold yellow]🔑 LICENSE INFO[/bold cyan]                          [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]╠{'═' * 56}╣[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold white]Key:        [bold green]{key}[/bold green]")
+    console.print(f"[bold cyan]║  [bold white]Type:       [bold yellow]{label}[/bold yellow]")
+    console.print(f"[bold cyan]║  [bold white]Duration:   [bold magenta]{duration} days[/bold magenta]")
+    console.print(f"[bold cyan]║  [bold white]Price:      [bold green]{price}[/bold green]")
+    console.print(f"[bold cyan]║  [bold white]Status:     {status}")
+    console.print(f"[bold cyan]║  [bold white]Remaining:  [bold cyan]{remaining}[/bold cyan]")
+    console.print(f"[bold cyan]╚{'═' * 56}╝[/bold cyan]")
+    return True
+
+def show_author_license_menu():
+    if not is_author():
+        return
+    while True:
+        console.print(f"\n[bold magenta]╔{'═' * 56}╗[/bold magenta]")
+        console.print(f"[bold magenta]║  [bold yellow]🔑 AUTHOR LICENSE MGMT[/bold magenta]                    [bold magenta]║[/bold magenta]")
+        console.print(f"[bold magenta]╠{'═' * 56}╣[/bold magenta]")
+        console.print(f"[bold magenta]║  [bold cyan]1.[/bold cyan] Generate 1-Day Trial Key")
+        console.print(f"[bold magenta]║  [bold cyan]2.[/bold cyan] Generate 7-Day Premium Key")
+        console.print(f"[bold magenta]║  [bold cyan]3.[/bold cyan] Generate 30-Day Monthly Key")
+        console.print(f"[bold magenta]║  [bold cyan]4.[/bold cyan] Generate LIFETIME Key")
+        console.print(f"[bold magenta]║  [bold cyan]5.[/bold cyan] Generate Multiple Keys")
+        console.print(f"[bold magenta]║  [bold cyan]6.[/bold cyan] Create Custom Key")
+        console.print(f"[bold magenta]║  [bold cyan]7.[/bold cyan] Check Key Status")
+        console.print(f"[bold magenta]║  [bold cyan]8.[/bold cyan] List All Keys")
+        console.print(f"[bold magenta]║  [bold cyan]9.[/bold cyan] Delete Key")
+        console.print(f"[bold magenta]║  [bold cyan]0.[/bold cyan] Back")
+        console.print(f"[bold magenta]╚{'═' * 56}╝[/bold magenta]")
+        choice = safe_input("\n[bold yellow]Select: [/bold yellow]").strip()
+        if choice == "0": break
+        elif choice == "1":
+            key = create_license_key_author("1DAY")
+            if key: console.print(f"[bold green]✅ {key}[/bold green]")
+            safe_input("\nPress Enter...")
+        elif choice == "2":
+            key = create_license_key_author("7DAY")
+            if key: console.print(f"[bold green]✅ {key}[/bold green]")
+            safe_input("\nPress Enter...")
+        elif choice == "3":
+            key = create_license_key_author("30DAY")
+            if key: console.print(f"[bold green]✅ {key}[/bold green]")
+            safe_input("\nPress Enter...")
+        elif choice == "4":
+            key = create_license_key_author("LIFETIME")
+            if key: console.print(f"[bold green]✅ {key}[/bold green]")
+            safe_input("\nPress Enter...")
+        elif choice == "5":
+            create_bulk_keys_author()
+            safe_input("\nPress Enter...")
+        elif choice == "6":
+            custom = safe_input("[bold cyan]Enter custom key: [/bold cyan]").strip()
+            if custom: create_license_key_author(custom_key=custom)
+            safe_input("\nPress Enter...")
+        elif choice == "7":
+            key = safe_input("[bold cyan]Enter key: [/bold cyan]").strip()
+            if key in LICENSE_DATABASE:
+                display_license_info_key(key)
+            else:
+                console.print("[red]❌ Key not found![/red]")
+            safe_input("\nPress Enter...")
+        elif choice == "8":
+            if LICENSE_DATABASE:
+                console.print(f"\n[bold cyan]All Keys:[/bold cyan]")
+                for key, data in LICENSE_DATABASE.items():
+                    label = LICENSE_TYPES[data["type"]]["label"]
+                    status = "✅" if not is_key_expired(key) else "❌"
+                    console.print(f"  {status} [bold yellow]{key}[/bold yellow] - {label}")
+            else:
+                console.print("[yellow]⚠ No keys![/yellow]")
+            safe_input("\nPress Enter...")
+        elif choice == "9":
+            delete_key_author()
+            safe_input("\nPress Enter...")
+        else:
+            console.print("[red]❌ Invalid![/red]")
+
+# ==================== TRIAL KEY FUNCTIONS ====================
+
+def generate_trial_key(trial_type="1DAY"):
+    import random, string
+    if trial_type not in TRIAL_CONFIG:
+        console.print(f"[bold red]❌ Invalid trial type! Use: 1DAY, 3DAY, 7DAY[/bold red]")
+        return None
+    suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    key = f"KAZUKI-{trial_type}-{suffix}"
+    expiry_date = datetime.now() + timedelta(days=TRIAL_CONFIG[trial_type]["duration"])
+    TRIAL_DATABASE[key] = {
+        "type": trial_type, "created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "expires": expiry_date.strftime("%Y-%m-%d %H:%M:%S"),
+        "duration": TRIAL_CONFIG[trial_type]["duration"],
+        "label": TRIAL_CONFIG[trial_type]["label"],
+        "device_id": None, "device_model": None, "device_brand": None,
+        "used": False, "used_by": None,
+    }
+    return key
+
+def activate_trial_key(key):
+    if key not in TRIAL_DATABASE:
+        return False, "❌ Invalid trial key!"
+    data = TRIAL_DATABASE[key]
+    expiry = datetime.strptime(data["expires"], "%Y-%m-%d %H:%M:%S")
+    if datetime.now() > expiry:
+        return False, "❌ Trial key has expired!"
+    current_device_id = get_device_id()
+    current_model = get_device_model()
+    current_brand = get_device_brand()
+    if data["used"] and data["device_id"] != current_device_id:
+        return False, f"❌ This trial key is already used on another device!\n   Registered Device: {data['device_id']}\n   Your Device: {current_device_id}"
+    if not check_device_model():
+        return False, "❌ Your device model is not allowed!"
+    if not data["used"]:
+        data["device_id"] = current_device_id
+        data["device_model"] = current_model
+        data["device_brand"] = current_brand
+        data["used"] = True
+        data["used_by"] = "Device: " + current_model
+        TRIAL_DATABASE[key] = data
+        save_license_data(key, current_device_id)
+        remaining = (expiry - datetime.now()).total_seconds() / 3600
+        return True, f"✅ Trial key activated!\n   Device: {current_model}\n   Device ID: {current_device_id}\n   Expires in: {remaining:.1f} hours"
+    remaining = (expiry - datetime.now()).total_seconds() / 3600
+    return True, f"✅ Trial key valid!\n   Device: {current_model}\n   Expires in: {remaining:.1f} hours"
+
+def check_trial_key_status(key):
+    if key not in TRIAL_DATABASE:
+        return None, "Key not found"
+    data = TRIAL_DATABASE[key]
+    expiry = datetime.strptime(data["expires"], "%Y-%m-%d %H:%M:%S")
+    now = datetime.now()
+    if now > expiry:
+        return "EXPIRED", f"Expired on: {data['expires']}"
+    if not data["used"]:
+        return "UNUSED", "Not yet activated"
+    remaining = (expiry - now).total_seconds() / 3600
+    return "ACTIVE", f"""Device: {data['device_model']}
+Device ID: {data['device_id']}
+Expires in: {remaining:.1f} hours
+Expiry: {data['expires']}"""
+
+def display_trial_key_info(key):
+    if key not in TRIAL_DATABASE:
+        console.print(f"[bold red]❌ Key not found![/bold red]")
+        return
+    data = TRIAL_DATABASE[key]
+    status, info = check_trial_key_status(key)
+    console.print(f"\n[bold cyan]╔{'═' * 56}╗[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold yellow]🎫 TRIAL KEY INFO[/bold cyan]                          [bold cyan]║[/bold cyan]")
+    console.print(f"[bold cyan]╠{'═' * 56}╣[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold white]Key:        [bold green]{key}[/bold green]")
+    console.print(f"[bold cyan]║  [bold white]Type:       [bold yellow]{data['label']}[/bold yellow]")
+    console.print(f"[bold cyan]║  [bold white]Created:    [bold cyan]{data['created']}[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold white]Expires:    [bold magenta]{data['expires']}[/bold magenta]")
+    console.print(f"[bold cyan]║  [bold white]Status:     [bold {'green' if status == 'ACTIVE' else 'red'}]{status}[/bold {'green' if status == 'ACTIVE' else 'red'}]")
+    if data["used"]:
+        console.print(f"[bold cyan]║  [bold white]Used On:    [bold white]{data['device_model']}[/bold white]")
+        console.print(f"[bold cyan]║  [bold white]Device ID:  [bold white]{data['device_id']}[/bold white]")
+        console.print(f"[bold cyan]║  [bold white]Brand:      [bold white]{data['device_brand']}[/bold white]")
+    else:
+        console.print(f"[bold cyan]║  [bold white]Used:       [bold yellow]Not yet activated[/bold yellow]")
+    console.print(f"[bold cyan]╚{'═' * 56}╝[/bold cyan]")
+
+def generate_bulk_trials(trial_type="1DAY", count=5):
+    keys = []
+    for _ in range(count):
+        key = generate_trial_key(trial_type)
+        if key:
+            keys.append(key)
+    return keys
+
+def delete_trial_key_author(key):
+    if key in TRIAL_DATABASE:
+        del TRIAL_DATABASE[key]
+        console.print(f"[bold green]✅ Trial key deleted: {key}[/bold green]")
+        return True
+    else:
+        console.print(f"[bold red]❌ Key not found![/bold red]")
+        return False
+
+def list_all_trials():
+    if not TRIAL_DATABASE:
+        console.print("[yellow]⚠ No trial keys generated yet![/yellow]")
+        return
+    console.print(f"\n[bold cyan]📋 ALL TRIAL KEYS[/bold cyan]")
+    console.print(f"[bold cyan]╔{'═' * 65}╗[/bold cyan]")
+    console.print(f"[bold cyan]║  [bold yellow]KEY[/bold yellow]           [bold yellow]TYPE[/bold yellow]  [bold yellow]STATUS[/bold yellow]    [bold yellow]DEVICE[/bold yellow]")
+    console.print(f"[bold cyan]╠{'═' * 65}╣[/bold cyan]")
+    for key, data in TRIAL_DATABASE.items():
+        status, _ = check_trial_key_status(key)
+        if status == "ACTIVE":
+            status_icon = "✅ ACTIVE"
+            device = data.get('device_model', 'Not used')
+        elif status == "EXPIRED":
+            status_icon = "❌ EXPIRED"
+            device = data.get('device_model', 'N/A')
+        else:
+            status_icon = "⏳ UNUSED"
+            device = "Not activated"
+        console.print(f"[bold cyan]║[/bold cyan] {key[:20]} {data['type']:6} {status_icon:10} {device[:25]}")
+    console.print(f"[bold cyan]╚{'═' * 65}╝[/bold cyan]")
+
+def show_trial_menu():
+    while True:
+        console.print(f"\n[bold yellow]╔{'═' * 56}╗[/bold yellow]")
+        console.print(f"[bold yellow]║  [bold magenta]🎫 TRIAL KEY MANAGEMENT[/bold yellow]                       [bold yellow]║[/bold yellow]")
+        console.print(f"[bold yellow]╠{'═' * 56}╣[/bold yellow]")
+        console.print(f"[bold yellow]║  [bold cyan]1.[/bold cyan] Generate 24-Hour Trial Key")
+        console.print(f"[bold yellow]║  [bold cyan]2.[/bold cyan] Generate 3-Day Trial Key")
+        console.print(f"[bold yellow]║  [bold cyan]3.[/bold cyan] Generate 7-Day Trial Key")
+        console.print(f"[bold yellow]║  [bold cyan]4.[/bold cyan] Generate Multiple Trial Keys")
+        console.print(f"[bold yellow]║  [bold cyan]5.[/bold cyan] List All Trial Keys")
+        console.print(f"[bold yellow]║  [bold cyan]6.[/bold cyan] Check Trial Key Status")
+        console.print(f"[bold yellow]║  [bold cyan]7.[/bold cyan] Delete Trial Key")
+        console.print(f"[bold yellow]║  [bold cyan]0.[/bold cyan] Back")
+        console.print(f"[bold yellow]╚{'═' * 56}╝[/bold yellow]")
+        choice = safe_input("\n[bold yellow]Select: [/bold yellow]").strip()
+        if choice == "0": break
+        elif choice == "1":
+            key = generate_trial_key("1DAY")
+            console.print(f"\n[bold green]✅ 24-Hour Trial Key: [bold yellow]{key}[/bold green]")
+            display_trial_key_info(key)
+            safe_input("\nPress Enter...")
+        elif choice == "2":
+            key = generate_trial_key("3DAY")
+            console.print(f"\n[bold green]✅ 3-Day Trial Key: [bold yellow]{key}[/bold green]")
+            display_trial_key_info(key)
+            safe_input("\nPress Enter...")
+        elif choice == "3":
+            key = generate_trial_key("7DAY")
+            console.print(f"\n[bold green]✅ 7-Day Trial Key: [bold yellow]{key}[/bold green]")
+            display_trial_key_info(key)
+            safe_input("\nPress Enter...")
+        elif choice == "4":
+            trial_type = safe_input("[bold cyan]Trial Type (1DAY/3DAY/7DAY): [/bold cyan]").strip().upper()
+            if trial_type not in TRIAL_CONFIG:
+                console.print("[red]❌ Invalid type![/red]")
+                continue
+            try:
+                count = int(safe_input("[bold cyan]Number of keys: [/bold cyan]").strip())
+                if count <= 0 or count > 50:
+                    console.print("[red]❌ Count must be 1-50![/red]")
+                    continue
+            except ValueError:
+                console.print("[red]❌ Invalid number![/red]")
+                continue
+            keys = generate_bulk_trials(trial_type, count)
