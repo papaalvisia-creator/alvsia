@@ -306,6 +306,11 @@ private fun MainWorkspace(
                     Text("UNIVERSAL INTELLIGENCE", color = Muted, fontSize = 8.sp, letterSpacing = 1.2.sp)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = {
+                        context.startActivity(android.content.Intent(context, SmartToolActivity::class.java))
+                    }) {
+                        Text("TOOL", color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
                     TextButton(onClick = { showSettings = true }) {
                         Text("KEY", color = Cyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
