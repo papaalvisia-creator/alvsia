@@ -55,7 +55,7 @@ object SmartToolEngine {
         val detail = when (type) {
             "LUA" -> {
                 val lr = inspectLua(h)
-                "Lua kind=\${lr.kind}; \${lr.detail}"
+                "Lua kind=${lr.kind}; ${lr.detail}"
             }
             "UE4 PAK" -> "UE4 PAK magic terdeteksi. Parsing indeks/enkripsi spesifik memerlukan backend PAK yang sesuai; file asli tidak disentuh."
             "ZIP/APK/JAR/AAB" -> "ZIP container terdeteksi; ekstraksi aman dapat dilakukan ke folder output baru."
@@ -72,7 +72,7 @@ object SmartToolEngine {
         if (bytes.size >= 4 && bytes.copyOfRange(0, 4).contentEquals(byteArrayOf(0x1B,0x4C,0x75,0x61))) {
             val version = if (bytes.size > 4) "0x%02X".format(bytes[4]) else "unknown"
             val fmt = if (bytes.size > 5) "format=0x%02X".format(bytes[5]) else "format=?"
-            return LuaReport("Lua bytecode", version, "\${bytes.take(8).toByteArray().toHex()} \$fmt", emptyList(), "Header Lua valid.")
+            return LuaReport("Lua bytecode", version, "${bytes.take(8).toByteArray().toHex()} \$fmt", emptyList(), "Header Lua valid.")
         }
         val text = bytes.toString(Charsets.UTF_8)
         if (looksLikeLuaSource(text)) {
@@ -133,12 +133,12 @@ object SmartToolEngine {
         val r = analyze(resolver, uri)
         return buildString {
             appendLine("ALVSIA SMART TOOL REPORT")
-            appendLine("FILE  : \${r.name}")
-            appendLine("TYPE  : \${r.type}")
-            appendLine("SIZE  : \${r.size}")
-            appendLine("SHA256: \${r.sha256}")
-            appendLine("DETAIL: \${r.detail}")
-            r.warnings.forEach { appendLine("WARN  : \$it") }
+            appendLine("FILE  : ${r.name}")
+            appendLine("TYPE  : ${r.type}")
+            appendLine("SIZE  : ${r.size}")
+            appendLine("SHA256: ${r.sha256}")
+            appendLine("DETAIL: ${r.detail}")
+            r.warnings.forEach { appendLine("WARN  : $it") }
         }
     }
 
@@ -154,9 +154,9 @@ object SmartToolEngine {
 
     private fun detectType(name: String, b: ByteArray): String {
         val lower = name.lowercase()
-        if (b.size >= 4 && b[0] == 0x5A && b[1] == 0x6F && b[2] == 0x12 && b[3] == 0xE1.toByte()) return "UE4 PAK"
-        if (b.size >= 4 && b[0] == 0x50 && b[1] == 0x4B) return "ZIP/APK/JAR/AAB"
-        if (b.size >= 4 && b[0] == 0x7F && b[1] == 'E'.code.toByte() && b[2] == 'L'.code.toByte() && b[3] == 'F'.code.toByte()) return "ELF"
+        if (b.size >= 4 && b[0] == 0x5A.toByte() && b[1] == 0x6F.toByte() && b[2] == 0x12.toByte() && b[3] == 0xE1.toByte()) return "UE4 PAK"
+        if (b.size >= 4 && b[0] == 0x50.toByte() && b[1] == 0x4B.toByte()) return "ZIP/APK/JAR/AAB"
+        if (b.size >= 4 && b[0] == 0x7F.toByte() && b[1] == 'E'.code.toByte() && b[2] == 'L'.code.toByte() && b[3] == 'F'.code.toByte()) return "ELF"
         if (b.size >= 2 && b[0] == 'M'.code.toByte() && b[1] == 'Z'.code.toByte()) return "PE"
         if (b.size >= 4 && b[0] == 'd'.code.toByte() && b[1] == 'e'.code.toByte() && b[2] == 'x'.code.toByte() && b[3] == 0x0A.toByte()) return "DEX"
         if (b.size >= 8 && b[0] == 0x89.toByte() && b[1] == 0x50.toByte() && b[2] == 0x4E.toByte() && b[3] == 0x47.toByte()) return "IMAGE"
@@ -174,7 +174,7 @@ object SmartToolEngine {
     private fun safeResolve(root: File, entry: String): File {
         val base = root.canonicalFile
         val target = File(base, entry).canonicalFile
-        require(target.path == base.path || target.path.startsWith(base.path + File.separator)) { "ZIP entry ditolak (zip-slip): \$entry" }
+        require(target.path == base.path || target.path.startsWith(base.path + File.separator)) { "ZIP entry ditolak (zip-slip): $entry" }
         return target
     }
 
