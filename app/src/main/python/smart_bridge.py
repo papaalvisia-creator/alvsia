@@ -70,7 +70,7 @@ def _pak(path,operation,out=None,inject=None):
         return {**info,"output":str(out),"repacked":bool(ok)}
     raise ValueError("unknown PAK operation")
 
-def run(path,operation="analyze",output=None,**kwargs):
+def run(path,operation="analyze",output=None,options=None):\n    kwargs = options or {}
     p=Path(path)
     if operation=="analyze": return analyze(p)
     typ=_detect(p.name,_head(p))
