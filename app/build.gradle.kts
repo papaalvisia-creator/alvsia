@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("com.chaquo.python")
     id("org.jetbrains.kotlin.plugin.compose")
     id("app.talsec.plugin") version "1.1.0"
 }
@@ -13,8 +14,8 @@ android {
         applicationId = "com.alvsia.ai.uncensored"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 8
+        versionName = "1.0.0"
         buildConfigField("String", "CERT_SHA256", "\"99b33815c88a17abbcfe22be15250363f6dfc79c11ffc980e71b62b74b1f295c\"")
         val telegramToken = (System.getenv("ALVSIA_TELEGRAM_BOT_TOKEN") ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
         val telegramChatId = (System.getenv("ALVSIA_TELEGRAM_CHAT_ID") ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
@@ -46,6 +47,19 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version = "3.13"
+        pip {
+            install("gmalg==1.1.2")
+            install("pycryptodome")
+            install("zstandard")
+            install("requests")
+            install("rich")
+        }
     }
 }
 

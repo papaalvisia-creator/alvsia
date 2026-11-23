@@ -13,13 +13,14 @@
     <application
         android:name=".AlvsiaApplication"
         android:theme="@style/Theme.AlvsiaAI"
-        android:label="ALVSIA AI UNCENSORED"
+        android:label="ALVSIA SMART TOOL"
         android:icon="@drawable/alvsia_ai_logo"
         android:allowBackup="false"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true">
+        <activity android:name=".SmartToolActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
